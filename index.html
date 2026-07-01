@@ -851,13 +851,24 @@ function confirmNewRed() {
     const nuevaRed = newRed(nuevoNumero);
     nuevaRed.materiales.balon = balon;
     nuevaRed.materiales.lineas = lineas;
+    nuevaRed.materiales.red = nombre;
 
     const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
     const aPromover = esperaOrdenada.slice(0, MAX_PER_RED - 1);
     const idsPromovidos = new Set(aPromover.map(p => p.id));
 
-    nuevaRed.jugadores = aPromover;
-    nuevaRed.jugadores.unshift({ id: uid(), nombre, hora: '—', ts: Date.now() });
+    nuevaRed.jugadores = aPromover.slice();
+
+    const creador = { id: uid(), nombre, hora: '—', ts: Date.now() };
+    nuevaRed.jugadores.unshift(creador);
+
+    if (balon.trim() !== nombre && nuevaRed.jugadores.length < MAX_PER_RED) {
+      nuevaRed.jugadores.push({ id: uid(), nombre: balon, hora: '—', ts: Date.now() });
+    }
+
+    if (lineas.trim() !== nombre && lineas.trim() !== balon && nuevaRed.jugadores.length < MAX_PER_RED) {
+      nuevaRed.jugadores.push({ id: uid(), nombre: lineas, hora: '—', ts: Date.now() });
+    }
 
     return {
       ...prev,
