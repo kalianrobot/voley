@@ -513,6 +513,12 @@
   background: var(--coral);
 }
 
+.cal-day-indicators {
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+
 .add-list-btn {
   width: 100%;
   border: 2px dashed var(--sea);
@@ -1171,8 +1177,24 @@ function renderCalendar() {
     if (hasList) classes.push('has-list');
     if (isToday) classes.push('is-today');
     const onclick = hasList ? `onclick="openLista('${cell.key}')"` : '';
+
+    let indicadores = '';
+    if (hasList) {
+      const lista = state.listas[cell.key];
+      const ind = [];
+      if (lista.redes && lista.redes.length > 0) {
+        lista.redes.forEach(red => {
+          ind.push(red.jugadores.length >= MAX_PER_RED ? '🔴' : '🟢');
+        });
+      }
+      if (lista.espera && lista.espera.length > 0) {
+        ind.push('🟠');
+      }
+      indicadores = ind.length > 0 ? `<div class="cal-day-indicators">${ind.join(' ')}</div>` : '';
+    }
+
     const dot = hasList ? '<span class="dot"></span>' : '';
-    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${dot}</div>`;
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${dot}${indicadores}</div>`;
   }).join('');
 
   const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
