@@ -716,10 +716,26 @@ function formatFechaLarga(key) {
   return `${diasSemana[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
-async function saveState(s) {
+async function runUpdate(updater, opts = {}) {
   saving = true;
   try {
-    await DOC_REF.set({ data: JSON.stringify(s) });
+    const nuevo = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(DOC_REF);
+      let remote = emptyState();
+      if (snap.exists) {
+        try {
+          remote = sanitizeState(JSON.parse(snap.data().data));
+        } catch (e) {
+          remote = emptyState();
+        }
+      }
+      const resultado = typeof updater === 'function' ? updater(remote) : updater;
+      tx.set(DOC_REF, { data: JSON.stringify(resultado) });
+      return resultado;
+    });
+    state = nuevo;
+    if (opts.render !== false) render();
+    return nuevo;
   } catch (e) {
     console.error('Error guardando en Firestore', e);
   } finally {
@@ -733,10 +749,8 @@ function esc(str) {
   return div.innerHTML;
 }
 
-function update(updater) {
-  state = typeof updater === 'function' ? updater(state) : updater;
-  saveState(state);
-  render();
+function update(updater, opts) {
+  return runUpdate(updater, opts);
 }
 
 /* ---------- Aviso de WhatsApp ---------- */
@@ -813,12 +827,12 @@ function closeNewListModal() {
   render();
 }
 
-function confirmNewList() {
+async function confirmNewList() {
   const input = document.getElementById('new-list-date');
   if (!input || !input.value) return;
   const fecha = input.value;
   const yaExistia = !!state.listas[fecha];
-  update(prev => {
+  await update(prev => {
     if (prev.listas[fecha]) return prev; // ya existe, no pisar
     return { ...prev, listas: { ...prev.listas, [fecha]: emptyLista() } };
   });
@@ -835,12 +849,12 @@ function getLista(fecha) {
   return state.listas[fecha];
 }
 
-function updateLista(fecha, updater) {
-  update(prev => {
+function updateLista(fecha, updater, opts) {
+  return update(prev => {
     const actual = prev.listas[fecha] || emptyLista();
     const nueva = typeof updater === 'function' ? updater(actual) : updater;
     return { ...prev, listas: { ...prev.listas, [fecha]: nueva } };
-  });
+  }, opts);
 }
 
 function openNewRedModal(fecha) {
@@ -854,7 +868,7 @@ function closeNewRedModal() {
   render();
 }
 
-function confirmNewRed() {
+async function confirmNewRed() {
   const { fecha, nombre, balon, lineas } = newRedData;
   if (!nombre.trim() || !balon.trim() || !lineas.trim()) {
     alert('Debe rellenar el nombre del creador, balón y líneas');
@@ -862,7 +876,7 @@ function confirmNewRed() {
   }
 
   let nuevoNumero = 0;
-  updateLista(fecha, prev => {
+  await updateLista(fecha, prev => {
     nuevoNumero = prev.redes.length + 1;
     const nuevaRed = newRed(nuevoNumero);
     nuevaRed.materiales.balon = balon;
@@ -924,9 +938,7 @@ function deleteLista(fecha) {
 }
 
 function setLugar(fecha, val) {
-  const lista = state.listas[fecha] || emptyLista();
-  state = { ...state, listas: { ...state.listas, [fecha]: { ...lista, lugar: val } } };
-  saveState(state);
+  updateLista(fecha, prev => ({ ...prev, lugar: val }), { render: false });
 }
 
 function setMaterial(fecha, redId, tipo, nombre) {
@@ -973,7 +985,7 @@ function updateHoraEspera(fecha, entryId, nuevaHora) {
   }));
 }
 
-function removeFromRed(fecha, redId, entryId) {
+async function removeFromRed(fecha, redId, entryId) {
   const lista = getLista(fecha);
   const red = lista.redes.find(r => r.id === redId);
   const persona = red?.jugadores.find(p => p.id === entryId);
@@ -981,7 +993,7 @@ function removeFromRed(fecha, redId, entryId) {
   if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
 
   let nombrePromovido = null;
-  updateLista(fecha, prev => {
+  await updateLista(fecha, prev => {
     const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
     if (esperaOrdenada.length > 0) nombrePromovido = esperaOrdenada[0].nombre;
     return {
