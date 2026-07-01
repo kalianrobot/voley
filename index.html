@@ -652,6 +652,8 @@ let saving = false;
 // vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha }
 let view = { screen: 'calendar', calYear: null, calMonth: null };
 let showNewListModal = false;
+let showNewRedModal = false;
+let newRedData = { fecha: null, nombre: '', balon: '', lineas: '' };
 let notifyMessage = null;
 
 function uid() {
@@ -825,17 +827,37 @@ function updateLista(fecha, updater) {
   });
 }
 
-function addRed(fecha) {
+function openNewRedModal(fecha) {
+  newRedData = { fecha, nombre: '', balon: '', lineas: '' };
+  showNewRedModal = true;
+  render();
+}
+
+function closeNewRedModal() {
+  showNewRedModal = false;
+  render();
+}
+
+function confirmNewRed() {
+  const { fecha, nombre, balon, lineas } = newRedData;
+  if (!nombre.trim() || !balon.trim() || !lineas.trim()) {
+    alert('Debe rellenar el nombre del creador, balón y líneas');
+    return;
+  }
+
   let nuevoNumero = 0;
   updateLista(fecha, prev => {
     nuevoNumero = prev.redes.length + 1;
     const nuevaRed = newRed(nuevoNumero);
+    nuevaRed.materiales.balon = balon;
+    nuevaRed.materiales.lineas = lineas;
 
     const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
     const aPromover = esperaOrdenada.slice(0, MAX_PER_RED - 1);
     const idsPromovidos = new Set(aPromover.map(p => p.id));
 
     nuevaRed.jugadores = aPromover;
+    nuevaRed.jugadores.unshift({ id: uid(), nombre, hora: '—', ts: Date.now() });
 
     return {
       ...prev,
@@ -843,7 +865,9 @@ function addRed(fecha) {
       redes: [...prev.redes, nuevaRed]
     };
   });
-  showNotify(`🏐 Nueva ${nuevoNumero}ª red abierta para el ${formatFechaLarga(fecha)}. ¡Apuntaos aquí! ${urlParaFecha(fecha)}`);
+
+  showNewRedModal = false;
+  showNotify(`🏐 Nueva ${nuevoNumero}ª red abierta por ${nombre}. ¡Apuntaos aquí! ${urlParaFecha(fecha)}`);
 }
 
 function sendConvocatoria(fecha) {
@@ -1154,6 +1178,33 @@ function renderNewListModal() {
   `;
 }
 
+function renderNewRedModal() {
+  if (!showNewRedModal) return '';
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeNewRedModal()">
+      <div class="modal-box">
+        <h3 class="modal-title">Nueva red</h3>
+        <div style="margin-bottom: 12px;">
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Nombre (quien la lleva)</label>
+          <input type="text" id="red-nombre" placeholder="Tu nombre" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Balón</label>
+          <input type="text" id="red-balon" placeholder="Marca o nombre" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
+        </div>
+        <div style="margin-bottom: 18px;">
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Líneas</label>
+          <input type="text" id="red-lineas" placeholder="Nombre o marca" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeNewRedModal()">Cancelar</button>
+          <button class="modal-btn confirm" onclick="newRedData.nombre = document.getElementById('red-nombre').value; newRedData.balon = document.getElementById('red-balon').value; newRedData.lineas = document.getElementById('red-lineas').value; confirmNewRed();">Crear red</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 /* ---------- Render: vista de lista de un dia ---------- */
 
 function renderListView() {
@@ -1203,7 +1254,7 @@ function renderListView() {
     </div>
 
     <div class="main">
-      <button class="add-red-btn" onclick="addRed('${fecha}')">+ Nueva red</button>
+      <button class="add-red-btn" onclick="openNewRedModal('${fecha}')">+ Nueva red</button>
       <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
       ${redesHtml}
       ${renderEsperaGlobal(fecha, lista)}
@@ -1238,7 +1289,7 @@ function render() {
     body = renderListView();
   }
 
-  app.innerHTML = body + renderNewListModal() + renderNotifyModal();
+  app.innerHTML = body + renderNewListModal() + renderNewRedModal() + renderNotifyModal();
 }
 
 function renderNotifyModal() {
