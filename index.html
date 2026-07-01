@@ -1,0 +1,1312 @@
+<div id="app"></div>
+<style>
+:root {
+  --sand: #F0E6D2;
+  --sand-deep: #E2D3B0;
+  --sea: #1B5E63;
+  --sea-deep: #0E3B40;
+  --coral: #E8694A;
+  --ink: #1F2A2E;
+  --paper: #FBF7EE;
+  --line: rgba(31,42,46,0.12);
+  --waiting: #B08642;
+}
+
+#app {
+  font-family: 'Sora', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--sand);
+  min-height: 100vh;
+  padding: 0;
+}
+
+.font-load {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+* { box-sizing: border-box; }
+
+.header {
+  background: linear-gradient(135deg, var(--sea-deep), var(--sea));
+  color: var(--paper);
+  padding: 28px 20px 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -40px;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: var(--sand);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  transform: scaleX(1.3);
+}
+
+.header-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--coral);
+  opacity: 0.95;
+  margin-bottom: 4px;
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 32px;
+  margin: 0;
+}
+
+.subtitle-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.field-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.field-pill input {
+  background: transparent;
+  border: none;
+  color: var(--paper);
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  outline: none;
+  min-width: 80px;
+}
+
+.field-pill input::placeholder { color: rgba(251,247,238,0.55); }
+.field-pill .icon { font-size: 14px; opacity: 0.85; }
+
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 20px 80px;
+}
+
+.add-red-btn {
+  width: 100%;
+  border: 2px dashed var(--sea);
+  background: transparent;
+  color: var(--sea);
+  font-family: 'Sora', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: background 0.15s, transform 0.1s;
+}
+.add-red-btn:hover { background: rgba(27,94,99,0.06); }
+.add-red-btn:active { transform: scale(0.99); }
+
+.red-card {
+  background: var(--paper);
+  border-radius: 18px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 0 var(--sand-deep), 0 8px 24px -12px rgba(14,59,64,0.25);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.red-card.closed { border-color: rgba(232,105,74,0.3); }
+
+.red-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.red-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.red-number {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--sea-deep);
+}
+
+.red-status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.red-status.open { background: rgba(27,94,99,0.1); color: var(--sea); }
+.red-status.closed-tag { background: rgba(232,105,74,0.12); color: var(--coral); }
+
+.delete-red {
+  background: none;
+  border: none;
+  color: var(--ink);
+  opacity: 0.35;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: opacity 0.15s, background 0.15s;
+}
+.delete-red:hover { opacity: 0.8; background: rgba(31,42,46,0.06); }
+
+.materials-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.material-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sand);
+  border-radius: 10px;
+  padding: 6px 10px 6px 8px;
+  font-size: 12.5px;
+}
+
+.material-chip .label { opacity: 0.6; font-size: 11px; }
+
+.material-chip select {
+  border: none;
+  background: transparent;
+  font-family: 'Sora', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+  max-width: 90px;
+}
+
+.players-list {
+  padding: 6px 18px 4px;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(31,42,46,0.06);
+}
+.player-row:last-child { border-bottom: none; }
+
+.player-slot-num {
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.35;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.player-name {
+  font-weight: 600;
+  font-size: 14.5px;
+  flex: 1;
+}
+
+.player-time {
+  font-size: 12.5px;
+  color: var(--sea);
+  background: rgba(27,94,99,0.08);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.player-time-input {
+  font-family: 'Sora', sans-serif;
+  font-size: 12.5px;
+  color: var(--sea);
+  background: rgba(27,94,99,0.08);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  outline: none;
+  width: 90px;
+  cursor: pointer;
+}
+.player-time-input:hover { border-color: rgba(27,94,99,0.3); }
+.player-time-input:focus { border-color: var(--sea); cursor: text; }
+
+.player-remove {
+  background: none;
+  border: none;
+  color: var(--ink);
+  opacity: 0.3;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px 6px;
+}
+.player-remove:hover { opacity: 0.75; }
+
+.empty-slot {
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--ink);
+  opacity: 0.32;
+  font-style: italic;
+  border-bottom: 1px solid rgba(31,42,46,0.06);
+}
+.empty-slot:last-child { border-bottom: none; }
+
+.join-form {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 18px;
+}
+
+.join-form input[type="text"] {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  outline: none;
+  background: var(--sand);
+}
+.join-form input[type="text"]:focus { border-color: var(--sea); }
+
+.join-form input[type="time"] {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  outline: none;
+  background: var(--sand);
+  width: 100px;
+}
+
+.join-btn {
+  background: var(--sea);
+  color: var(--paper);
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.join-btn:hover { background: var(--sea-deep); }
+.join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.waitlist {
+  background: rgba(176,134,66,0.08);
+  padding: 12px 18px 16px;
+  border-top: 1px dashed rgba(176,134,66,0.4);
+}
+
+.waitlist-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--waiting);
+  margin-bottom: 8px;
+}
+
+.waitlist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.waitlist-row .player-name { color: var(--ink); }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ink);
+  opacity: 0.5;
+}
+
+.empty-state .big {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  color: var(--sea);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .title { font-size: 26px; }
+  .join-form { flex-wrap: wrap; }
+  .join-form input[type="text"] { width: 100%; }
+}
+
+/* --- Calendario y navegacion --- */
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--paper);
+  font-family: 'Sora', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: background 0.15s;
+}
+.back-btn:hover { background: rgba(255,255,255,0.18); }
+
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cal-nav-btn {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+  color: var(--sea-deep);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cal-nav-btn:hover { background: var(--sand-deep); }
+
+.cal-month-label {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 19px;
+  color: var(--sea-deep);
+  text-transform: capitalize;
+}
+
+.calendar-grid {
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 2px 0 var(--sand-deep), 0 8px 24px -12px rgba(14,59,64,0.25);
+  border: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+
+.cal-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  opacity: 0.4;
+  padding: 6px 0;
+}
+
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-day {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.3;
+  cursor: default;
+}
+
+.cal-day.in-month { opacity: 0.55; }
+
+.cal-day.has-list {
+  opacity: 1;
+  cursor: pointer;
+  background: rgba(27,94,99,0.1);
+  color: var(--sea-deep);
+  transition: background 0.15s, transform 0.1s;
+}
+.cal-day.has-list:hover { background: rgba(27,94,99,0.18); }
+.cal-day.has-list:active { transform: scale(0.95); }
+
+.cal-day.is-today.in-month {
+  opacity: 1;
+  box-shadow: inset 0 0 0 2px var(--coral);
+}
+
+.cal-day .dot {
+  position: absolute;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--coral);
+}
+
+.add-list-btn {
+  width: 100%;
+  border: 2px dashed var(--sea);
+  background: transparent;
+  color: var(--sea);
+  font-family: 'Sora', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.add-list-btn:hover { background: rgba(27,94,99,0.06); }
+.add-list-btn:active { transform: scale(0.99); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(14,59,64,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal-box {
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 24px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 16px 40px -12px rgba(14,59,64,0.4);
+}
+
+.modal-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--sea-deep);
+  margin: 0 0 14px;
+}
+
+.modal-box input[type="date"] {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  outline: none;
+  background: var(--sand);
+  margin-bottom: 18px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
+}
+
+.modal-btn.cancel {
+  background: transparent;
+  color: var(--ink);
+  opacity: 0.6;
+}
+.modal-btn.cancel:hover { opacity: 1; }
+
+.modal-btn.confirm {
+  background: var(--sea);
+  color: var(--paper);
+}
+.modal-btn.confirm:hover { background: var(--sea-deep); }
+
+.list-date-label {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--coral);
+  margin-bottom: 2px;
+  text-transform: capitalize;
+}
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyArP-V_vPSaIPz_ulWbP07rvPKDJSPVp1s",
+  authDomain: "volea-beach-forever.firebaseapp.com",
+  projectId: "volea-beach-forever",
+  storageBucket: "volea-beach-forever.firebasestorage.app",
+  messagingSenderId: "362602975964",
+  appId: "1:362602975964:web:d5674876d2e68d8c6f9a19"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_REF = db.collection('volea').doc('lista-actual');
+
+const MAX_PER_RED = 6;
+const APP_URL = 'https://volea-beach-forever.web.app';
+
+function urlParaFecha(fecha) {
+  return `${APP_URL}/?fecha=${fecha}`;
+}
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
+
+let state = null;        // { listas: { 'YYYY-MM-DD': { lugar, redes } } }
+let loading = true;
+let saving = false;
+
+// vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha }
+let view = { screen: 'calendar', calYear: null, calMonth: null };
+let showNewListModal = false;
+let notifyMessage = null;
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function emptyState() {
+  return { listas: {} };
+}
+
+function newRed(num) {
+  return {
+    id: uid(),
+    numero: num,
+    materiales: { balon: '', red: '', lineas: '' },
+    jugadores: [],
+    espera: []
+  };
+}
+
+function emptyLista() {
+  return { lugar: '', redes: [] };
+}
+
+function todayStr() {
+  const d = new Date();
+  return formatDateKey(d);
+}
+
+function formatDateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseDateKey(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatFechaLarga(key) {
+  const d = parseDateKey(key);
+  const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  return `${diasSemana[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
+}
+
+async function saveState(s) {
+  saving = true;
+  try {
+    await DOC_REF.set({ data: JSON.stringify(s) });
+  } catch (e) {
+    console.error('Error guardando en Firestore', e);
+  } finally {
+    saving = false;
+  }
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function update(updater) {
+  state = typeof updater === 'function' ? updater(state) : updater;
+  saveState(state);
+  render();
+}
+
+/* ---------- Aviso de WhatsApp ---------- */
+
+function showNotify(mensaje) {
+  notifyMessage = mensaje;
+  render();
+}
+
+function closeNotify() {
+  notifyMessage = null;
+  render();
+}
+
+function copyAndOpenWhatsapp() {
+  if (!notifyMessage) return;
+  const texto = notifyMessage;
+  const fallbackCopy = () => {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(textarea);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  notifyMessage = null;
+  render();
+}
+
+/* ---------- Navegacion ---------- */
+
+function goToCalendar() {
+  const today = new Date();
+  view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
+  render();
+}
+
+function openLista(fecha) {
+  view = { screen: 'list', fecha };
+  render();
+}
+
+function calPrevMonth() {
+  let { calYear, calMonth } = view;
+  calMonth -= 1;
+  if (calMonth < 0) { calMonth = 11; calYear -= 1; }
+  view = { ...view, calYear, calMonth };
+  render();
+}
+
+function calNextMonth() {
+  let { calYear, calMonth } = view;
+  calMonth += 1;
+  if (calMonth > 11) { calMonth = 0; calYear += 1; }
+  view = { ...view, calYear, calMonth };
+  render();
+}
+
+function openNewListModal() {
+  showNewListModal = true;
+  render();
+}
+
+function closeNewListModal() {
+  showNewListModal = false;
+  render();
+}
+
+function confirmNewList() {
+  const input = document.getElementById('new-list-date');
+  if (!input || !input.value) return;
+  const fecha = input.value;
+  const yaExistia = !!state.listas[fecha];
+  update(prev => {
+    if (prev.listas[fecha]) return prev; // ya existe, no pisar
+    return { ...prev, listas: { ...prev.listas, [fecha]: emptyLista() } };
+  });
+  showNewListModal = false;
+  openLista(fecha);
+  if (!yaExistia) {
+    showNotify(`📅 Nueva lista creada para el ${formatFechaLarga(fecha)}. ¡Apuntaos! ${urlParaFecha(fecha)}`);
+  }
+}
+
+/* ---------- Acciones sobre una lista concreta ---------- */
+
+function getLista(fecha) {
+  return state.listas[fecha];
+}
+
+function updateLista(fecha, updater) {
+  update(prev => {
+    const actual = prev.listas[fecha] || emptyLista();
+    const nueva = typeof updater === 'function' ? updater(actual) : updater;
+    return { ...prev, listas: { ...prev.listas, [fecha]: nueva } };
+  });
+}
+
+function addRed(fecha) {
+  let nuevoNumero = 0;
+  updateLista(fecha, prev => {
+    nuevoNumero = prev.redes.length + 1;
+    return { ...prev, redes: [...prev.redes, newRed(nuevoNumero)] };
+  });
+  showNotify(`🏐 Nueva ${nuevoNumero}ª red abierta para el ${formatFechaLarga(fecha)}. ¡Apuntaos aquí! ${urlParaFecha(fecha)}`);
+}
+
+function sendConvocatoria(fecha) {
+  showNotify(`📣 Lista abierta ${formatFechaLarga(fecha)}. ¡Apúntate aquí! ${urlParaFecha(fecha)}`);
+}
+function deleteRed(fecha, id) {
+  const lista = getLista(fecha);
+  const red = lista.redes.find(r => r.id === id);
+  const etiqueta = red ? `la ${red.numero}ª red` : 'esta red';
+  if (!confirm(`¿Seguro que quieres borrar ${etiqueta}? Se perderán todos sus jugadores y lista de espera.`)) return;
+  updateLista(fecha, prev => ({
+    ...prev,
+    redes: prev.redes.filter(r => r.id !== id).map((r, i) => ({ ...r, numero: i + 1 }))
+  }));
+  showNotify(`⚠️ Se ha borrado ${etiqueta} del ${formatFechaLarga(fecha)}.`);
+}
+
+function deleteLista(fecha) {
+  if (!confirm(`¿Borrar toda la lista del ${formatFechaLarga(fecha)}? Se perderá todo lo apuntado.`)) return;
+  update(prev => {
+    const listas = { ...prev.listas };
+    delete listas[fecha];
+    return { ...prev, listas };
+  });
+  goToCalendar();
+  showNotify(`🗑️ Se ha borrado la lista completa del ${formatFechaLarga(fecha)}.`);
+}
+
+function setLugar(fecha, val) {
+  const lista = state.listas[fecha] || emptyLista();
+  state = { ...state, listas: { ...state.listas, [fecha]: { ...lista, lugar: val } } };
+  saveState(state);
+}
+
+function setMaterial(fecha, redId, tipo, nombre) {
+  updateLista(fecha, prev => ({
+    ...prev,
+    redes: prev.redes.map(r => r.id === redId
+      ? { ...r, materiales: { ...r.materiales, [tipo]: nombre } }
+      : r)
+  }));
+}
+
+function joinRed(fecha, redId, nombre, hora) {
+  updateLista(fecha, prev => ({
+    ...prev,
+    redes: prev.redes.map(r => {
+      if (r.id !== redId) return r;
+      const entry = { id: uid(), nombre, hora };
+      if (r.jugadores.length < MAX_PER_RED) {
+        return { ...r, jugadores: [...r.jugadores, entry] };
+      }
+      return { ...r, espera: [...r.espera, entry] };
+    })
+  }));
+}
+
+function updateHora(fecha, redId, entryId, fromWaitlist, nuevaHora) {
+  const hora = nuevaHora || '—';
+  updateLista(fecha, prev => ({
+    ...prev,
+    redes: prev.redes.map(r => {
+      if (r.id !== redId) return r;
+      const campo = fromWaitlist ? 'espera' : 'jugadores';
+      return {
+        ...r,
+        [campo]: r[campo].map(p => p.id === entryId ? { ...p, hora } : p)
+      };
+    })
+  }));
+}
+
+function removeFromRed(fecha, redId, entryId, fromWaitlist) {
+  const lista = getLista(fecha);
+  const red = lista.redes.find(r => r.id === redId);
+  const listaPersonas = fromWaitlist ? red?.espera : red?.jugadores;
+  const persona = listaPersonas?.find(p => p.id === entryId);
+  const nombre = persona ? persona.nombre : 'esta persona';
+  if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
+  updateLista(fecha, prev => ({
+    ...prev,
+    redes: prev.redes.map(r => {
+      if (r.id !== redId) return r;
+      if (fromWaitlist) {
+        return { ...r, espera: r.espera.filter(e => e.id !== entryId) };
+      }
+      const jugadores = r.jugadores.filter(e => e.id !== entryId);
+      let espera = r.espera;
+      if (jugadores.length < MAX_PER_RED && espera.length > 0) {
+        const [promoted, ...rest] = espera;
+        jugadores.push(promoted);
+        espera = rest;
+      }
+      return { ...r, jugadores, espera };
+    })
+  }));
+  showNotify(`❌ ${nombre} se ha quitado de la ${red?.numero}ª red del ${formatFechaLarga(fecha)}.`);
+}
+
+function getAllMembers(lista) {
+  const set = new Set();
+  const redes = (lista && Array.isArray(lista.redes)) ? lista.redes : [];
+  redes.forEach(r => {
+    (r.jugadores || []).forEach(j => set.add(j.nombre));
+    (r.espera || []).forEach(j => set.add(j.nombre));
+  });
+  return [...set].sort();
+}
+
+/* ---------- Render: chips, redes ---------- */
+
+function renderMaterialChip(fecha, redId, icon, label, tipo, value, options) {
+  const opts = ['<option value="">—</option>']
+    .concat(options.map(name => `<option value="${esc(name)}" ${name === value ? 'selected' : ''}>${esc(name)}</option>`));
+  if (value && !options.includes(value)) {
+    opts.push(`<option value="${esc(value)}" selected>${esc(value)}</option>`);
+  }
+  return `
+    <div class="material-chip">
+      <span>${icon}</span>
+      <span class="label">${label}:</span>
+      <select onchange="setMaterial('${fecha}','${redId}','${tipo}', this.value)">
+        ${opts.join('')}
+      </select>
+    </div>
+  `;
+}
+
+function renderRed(fecha, red, allMembers) {
+  const isClosed = red.jugadores.length >= MAX_PER_RED;
+  const slotsLeft = MAX_PER_RED - red.jugadores.length;
+
+  let playersHtml = '';
+  for (let i = 0; i < MAX_PER_RED; i++) {
+    const p = red.jugadores[i];
+    if (p) {
+      playersHtml += `
+        <div class="player-row">
+          <span class="player-slot-num">${i + 1}</span>
+          <span class="player-name">${esc(p.nombre)}</span>
+          <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', false, this.value)" />
+          <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}', false)" title="Quitar">✕</button>
+        </div>`;
+    } else {
+      playersHtml += `<div class="empty-slot">${i + 1}. libre</div>`;
+    }
+  }
+
+  let waitlistHtml = '';
+  if (red.espera.length > 0) {
+    waitlistHtml = `
+      <div class="waitlist">
+        <div class="waitlist-title">Lista de espera</div>
+        ${red.espera.map((p, i) => `
+          <div class="waitlist-row">
+            <span class="player-slot-num">${i + 1}</span>
+            <span class="player-name">${esc(p.nombre)}</span>
+            <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', true, this.value)" />
+            <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}', true)" title="Quitar">✕</button>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  const nameInputId = `name-${red.id}`;
+  const timeInputId = `time-${red.id}`;
+  const placeholder = isClosed ? 'Apuntarme a lista de espera' : 'Tu nombre';
+  const btnLabel = isClosed ? 'Esperar' : 'Apuntarme';
+
+  return `
+    <div class="red-card ${isClosed ? 'closed' : ''}">
+      <div class="red-head">
+        <div class="red-name-row">
+          <span class="red-number">${red.numero}ª red</span>
+          <span class="red-status ${isClosed ? 'closed-tag' : 'open'}">
+            ${isClosed ? 'Cerrada' : `${slotsLeft} libre${slotsLeft !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+        <button class="delete-red" onclick="deleteRed('${fecha}','${red.id}')" title="Borrar red">✕</button>
+      </div>
+
+      <div class="materials-row">
+        ${renderMaterialChip(fecha, red.id, '🏐', 'Balón', 'balon', red.materiales.balon, allMembers)}
+        ${renderMaterialChip(fecha, red.id, '🥅', 'Red', 'red', red.materiales.red, allMembers)}
+        ${renderMaterialChip(fecha, red.id, '〜', 'Líneas', 'lineas', red.materiales.lineas, allMembers)}
+      </div>
+
+      <div class="players-list">
+        ${playersHtml}
+      </div>
+
+      <div class="join-form">
+        <input type="text" id="${nameInputId}" placeholder="${placeholder}" maxlength="30" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleJoinClick('${fecha}','${red.id}','${nameInputId}','${timeInputId}');}" />
+        <input type="time" lang="es" id="${timeInputId}" />
+        <button class="join-btn" type="button" onclick="handleJoinClick('${fecha}','${red.id}','${nameInputId}','${timeInputId}')">${btnLabel}</button>
+      </div>
+
+      ${waitlistHtml}
+    </div>
+  `;
+}
+
+function handleJoinClick(fecha, redId, nameInputId, timeInputId) {
+  const nameInput = document.getElementById(nameInputId);
+  const timeInput = document.getElementById(timeInputId);
+  if (!nameInput) {
+    console.error('No se encontro el input de nombre', nameInputId);
+    return;
+  }
+  const nombre = nameInput.value.trim();
+  if (!nombre) {
+    nameInput.focus();
+    return;
+  }
+  const hora = (timeInput && timeInput.value) || '—';
+  joinRed(fecha, redId, nombre, hora);
+}
+
+/* ---------- Render: calendario ---------- */
+
+function renderCalendar() {
+  const { calYear, calMonth } = view;
+  const today = todayStr();
+
+  const firstOfMonth = new Date(calYear, calMonth, 1);
+  let startWeekday = firstOfMonth.getDay(); // 0=domingo
+  startWeekday = (startWeekday + 6) % 7; // convertir a 0=lunes
+
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) {
+    const dayNum = daysInPrevMonth - startWeekday + i + 1;
+    cells.push({ dayNum, inMonth: false, key: null });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = formatDateKey(new Date(calYear, calMonth, d));
+    cells.push({ dayNum: d, inMonth: true, key });
+  }
+  while (cells.length % 7 !== 0) {
+    const idx = cells.length - (startWeekday + daysInMonth);
+    cells.push({ dayNum: idx + 1, inMonth: false, key: null });
+  }
+
+  const daysHtml = cells.map(cell => {
+    const hasList = cell.key && state.listas[cell.key];
+    const isToday = cell.key === today;
+    const classes = ['cal-day'];
+    if (cell.inMonth) classes.push('in-month');
+    if (hasList) classes.push('has-list');
+    if (isToday) classes.push('is-today');
+    const onclick = hasList ? `onclick="openLista('${cell.key}')"` : '';
+    const dot = hasList ? '<span class="dot"></span>' : '';
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${dot}</div>`;
+  }).join('');
+
+  const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
+
+  return `
+    <div class="main">
+      <div class="cal-toolbar">
+        <button class="cal-nav-btn" onclick="calPrevMonth()">‹</button>
+        <span class="cal-month-label">${MESES[calMonth]} ${calYear}</span>
+        <button class="cal-nav-btn" onclick="calNextMonth()">›</button>
+      </div>
+      <div class="calendar-grid">
+        <div class="cal-weekdays">${weekdaysHtml}</div>
+        <div class="cal-days">${daysHtml}</div>
+      </div>
+      <button class="add-list-btn" onclick="openNewListModal()">+ Nueva lista</button>
+    </div>
+  `;
+}
+
+function renderNewListModal() {
+  if (!showNewListModal) return '';
+  const today = todayStr();
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeNewListModal()">
+      <div class="modal-box">
+        <h3 class="modal-title">Nueva lista</h3>
+        <input type="date" id="new-list-date" value="${today}" />
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeNewListModal()">Cancelar</button>
+          <button class="modal-btn confirm" onclick="confirmNewList()">Crear</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Render: vista de lista de un dia ---------- */
+
+function renderListView() {
+  const fecha = view.fecha;
+  const lista = getLista(fecha);
+
+  if (!lista) {
+    return `
+      <div class="main">
+        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        <div class="empty-state">
+          <div class="big">Esta lista ya no existe</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const allMembers = getAllMembers(lista);
+
+  let redesHtml = '';
+  if (lista.redes.length === 0) {
+    redesHtml = `
+      <div class="empty-state">
+        <div class="big">Todavía no hay redes</div>
+        <div>Crea la primera para empezar a apuntar gente</div>
+      </div>`;
+  } else {
+    redesHtml = lista.redes.map(red => renderRed(fecha, red, allMembers)).join('');
+  }
+
+  return `
+    <div class="header">
+      <div class="header-inner">
+        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        <div class="eyebrow">Volea Beach Forever 🏝️</div>
+        <div class="list-date-label">${formatFechaLarga(fecha)}</div>
+        <div class="title-row">
+          <h1 class="title">Lista del día</h1>
+        </div>
+        <div class="subtitle-row">
+          <div class="field-pill">
+            <span class="icon">📍</span>
+            <input type="text" id="lugar-input" placeholder="Lugar (Ereaga, etc.)" value="${esc(lista.lugar)}" oninput="setLugar('${fecha}', this.value)" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <button class="add-red-btn" onclick="addRed('${fecha}')">+ Nueva red</button>
+      <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
+      ${redesHtml}
+      <button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:8px;" onclick="deleteLista('${fecha}')">🗑 Borrar esta lista</button>
+    </div>
+  `;
+}
+
+/* ---------- Render principal ---------- */
+
+function render() {
+  const app = document.getElementById('app');
+  if (loading) {
+    app.innerHTML = '<div class="loading-screen">Cargando…</div>';
+    return;
+  }
+
+  let body = '';
+  if (view.screen === 'calendar') {
+    body = `
+      <div class="header">
+        <div class="header-inner">
+          <div class="eyebrow">Volea Beach Forever 🏝️</div>
+          <div class="title-row">
+            <h1 class="title">Calendario</h1>
+          </div>
+        </div>
+      </div>
+      ${renderCalendar()}
+    `;
+  } else if (view.screen === 'list') {
+    body = renderListView();
+  }
+
+  app.innerHTML = body + renderNewListModal() + renderNotifyModal();
+}
+
+function renderNotifyModal() {
+  if (!notifyMessage) return '';
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeNotify()">
+      <div class="modal-box">
+        <h3 class="modal-title">📣 Avisar al grupo</h3>
+        <p style="font-size:14px; line-height:1.5; margin:0 0 18px; background:var(--sand); padding:12px 14px; border-radius:10px;">${esc(notifyMessage)}</p>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeNotify()">No avisar</button>
+          <button class="modal-btn confirm" onclick="copyAndOpenWhatsapp()">Copiar y abrir WhatsApp</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function sanitizeLista(l) {
+  const lugar = (l && typeof l.lugar === 'string') ? l.lugar : '';
+  const redesRaw = (l && Array.isArray(l.redes)) ? l.redes : [];
+  const redes = redesRaw.map((r, i) => ({
+    id: r.id || uid(),
+    numero: r.numero || (i + 1),
+    materiales: {
+      balon: (r.materiales && r.materiales.balon) || '',
+      red: (r.materiales && r.materiales.red) || '',
+      lineas: (r.materiales && r.materiales.lineas) || ''
+    },
+    jugadores: Array.isArray(r.jugadores) ? r.jugadores : [],
+    espera: Array.isArray(r.espera) ? r.espera : []
+  }));
+  return { lugar, redes };
+}
+
+function sanitizeState(s) {
+  if (!s || typeof s !== 'object' || !s.listas || typeof s.listas !== 'object') {
+    return emptyState();
+  }
+  const listas = {};
+  Object.keys(s.listas).forEach(fecha => {
+    listas[fecha] = sanitizeLista(s.listas[fecha]);
+  });
+  return { listas };
+}
+
+function getFechaFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fecha = params.get('fecha');
+    if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) return fecha;
+  } catch (e) {
+    // ignorar
+  }
+  return null;
+}
+
+function init() {
+  loading = true;
+  const today = new Date();
+  view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
+  render();
+
+  DOC_REF.onSnapshot(
+    (snap) => {
+      if (saving) return;
+      let remote = emptyState();
+      if (snap.exists) {
+        const data = snap.data();
+        try {
+          remote = sanitizeState(JSON.parse(data.data));
+        } catch (e) {
+          console.error('Error parseando datos de Firestore', e);
+          remote = emptyState();
+        }
+      }
+
+      const activeFocus = document.activeElement;
+      const isTyping = activeFocus && activeFocus.tagName === 'INPUT';
+
+      if (loading) {
+        state = remote;
+        loading = false;
+        const fechaUrl = getFechaFromUrl();
+        if (fechaUrl && state.listas[fechaUrl]) {
+          view = { screen: 'list', fecha: fechaUrl };
+        }
+        render();
+        return;
+      }
+
+      if (isTyping) return;
+      if (JSON.stringify(state) === JSON.stringify(remote)) return;
+      state = remote;
+      render();
+    },
+    (err) => {
+      console.error('Error escuchando Firestore', err);
+      if (loading) {
+        state = emptyState();
+        loading = false;
+        render();
+      }
+    }
+  );
+}
+
+init();
+</script>
