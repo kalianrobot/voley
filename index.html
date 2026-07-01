@@ -928,8 +928,11 @@ function removeFromRed(fecha, redId, entryId) {
   const persona = red?.jugadores.find(p => p.id === entryId);
   const nombre = persona ? persona.nombre : 'esta persona';
   if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
+
+  let nombrePromovido = null;
   updateLista(fecha, prev => {
     const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    if (esperaOrdenada.length > 0) nombrePromovido = esperaOrdenada[0].nombre;
     return {
       ...prev,
       espera: esperaOrdenada.slice(1),
@@ -941,7 +944,12 @@ function removeFromRed(fecha, redId, entryId) {
       })
     };
   });
-  showNotify(`❌ ${nombre} se ha quitado de la ${red?.numero}ª red del ${formatFechaLarga(fecha)}.`);
+
+  let mensaje = `❌ ${nombre} se ha quitado de la ${red?.numero}ª red del ${formatFechaLarga(fecha)}.`;
+  if (nombrePromovido) {
+    mensaje += ` ✅ ${nombrePromovido} subió automáticamente de la lista de espera.`;
+  }
+  showNotify(mensaje);
 }
 
 function removeFromEspera(fecha, entryId) {
