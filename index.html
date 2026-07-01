@@ -1113,6 +1113,27 @@ function handleJoinClick(fecha, redId, nameInputId, timeInputId) {
   }
   const hora = (timeInput && timeInput.value) || '—';
   joinRed(fecha, redId, nombre, hora);
+  nameInput.value = '';
+  if (timeInput) timeInput.value = '';
+}
+
+function handleJoinEspera(fecha, nameInputId, timeInputId) {
+  const nameInput = document.getElementById(nameInputId);
+  const timeInput = document.getElementById(timeInputId);
+  if (!nameInput) return;
+  const nombre = nameInput.value.trim();
+  if (!nombre) {
+    nameInput.focus();
+    return;
+  }
+  const hora = (timeInput && timeInput.value) || '—';
+  updateLista(fecha, prev => ({
+    ...prev,
+    espera: [...(prev.espera || []), { id: uid(), nombre, hora, ts: Date.now() }]
+  }));
+  nameInput.value = '';
+  if (timeInput) timeInput.value = '';
+  showNotify(`✅ ${nombre} se ha apuntado a la lista de espera del ${formatFechaLarga(fecha)}.`);
 }
 
 /* ---------- Render: calendario ---------- */
@@ -1241,6 +1262,14 @@ function renderListView() {
       <div class="empty-state">
         <div class="big">Todavía no hay redes</div>
         <div>Crea la primera para empezar a apuntar gente</div>
+      </div>
+      <div style="margin-top: 24px; padding: 16px; background: rgba(27,94,99,0.06); border-radius: 14px; border: 2px dashed rgba(27,94,99,0.3);">
+        <div style="font-size: 13px; font-weight: 600; color: var(--sea); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em;">O apúntate a la lista de espera</div>
+        <div class="join-form" style="padding: 0;">
+          <input type="text" id="espera-nombre" placeholder="Tu nombre" maxlength="30" style="flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-family:'Sora',sans-serif; font-size: 14px; outline: none; background: var(--sand);" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleJoinEspera('${fecha}','espera-nombre','espera-hora');}" />
+          <input type="time" lang="es" id="espera-hora" style="border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; font-family:'Sora',sans-serif; font-size: 14px; outline: none; background: var(--sand); width: 100px;" />
+          <button class="join-btn" type="button" onclick="handleJoinEspera('${fecha}','espera-nombre','espera-hora')" style="flex-shrink: 0;">Apuntarme</button>
+        </div>
       </div>`;
   } else {
     redesHtml = lista.redes.map(red => renderRed(fecha, red, allMembers)).join('');
