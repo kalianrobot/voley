@@ -477,14 +477,17 @@
   position: relative;
   aspect-ratio: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
   opacity: 0.3;
   cursor: default;
+  gap: 2px;
+  padding: 4px 0;
 }
 
 .cal-day.in-month { opacity: 0.55; }
@@ -516,7 +519,14 @@
 .cal-day-indicators {
   font-size: 12px;
   letter-spacing: 2px;
-  margin-top: 2px;
+}
+
+.cal-day-espera {
+  font-size: 9px;
+  font-weight: bold;
+  color: #ff6b6b;
+  text-align: center;
+  line-height: 1;
 }
 
 .add-list-btn {
@@ -1179,6 +1189,7 @@ function renderCalendar() {
     const onclick = hasList ? `onclick="openLista('${cell.key}')"` : '';
 
     let indicadores = '';
+    let esperaCount = '';
     if (hasList) {
       const lista = state.listas[cell.key];
       const ind = [];
@@ -1187,14 +1198,14 @@ function renderCalendar() {
           ind.push(red.jugadores.length >= MAX_PER_RED ? '🔴' : '🟢');
         });
       }
-      if (lista.espera && lista.espera.length > 0) {
-        ind.push('🟠');
-      }
       indicadores = ind.length > 0 ? `<div class="cal-day-indicators">${ind.join(' ')}</div>` : '';
+
+      if (lista.espera && lista.espera.length > 0) {
+        esperaCount = `<div class="cal-day-espera">${lista.espera.length} en espera</div>`;
+      }
     }
 
-    const dot = hasList ? '<span class="dot"></span>' : '';
-    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${dot}${indicadores}</div>`;
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${indicadores}${esperaCount}</div>`;
   }).join('');
 
   const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
