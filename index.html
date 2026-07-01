@@ -606,6 +606,14 @@
   margin-bottom: 2px;
   text-transform: capitalize;
 }
+
+.waitlist-global {
+  background: rgba(176,134,66,0.08);
+  border: 1px dashed rgba(176,134,66,0.4);
+  border-radius: 14px;
+  padding: 14px 18px 16px;
+  margin-bottom: 22px;
+}
 </style>
 
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -659,13 +667,12 @@ function newRed(num) {
     id: uid(),
     numero: num,
     materiales: { balon: '', red: '', lineas: '' },
-    jugadores: [],
-    espera: []
+    jugadores: []
   };
 }
 
 function emptyLista() {
-  return { lugar: '', redes: [] };
+  return { lugar: '', espera: [], redes: [] };
 }
 
 function todayStr() {
@@ -824,18 +831,17 @@ function addRed(fecha) {
     nuevoNumero = prev.redes.length + 1;
     const nuevaRed = newRed(nuevoNumero);
 
-    const todosEnEspera = prev.redes.flatMap(r => r.espera.map(p => ({ ...p, _redId: r.id })));
-    const aPromover = todosEnEspera.slice(0, MAX_PER_RED - 1);
+    const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const aPromover = esperaOrdenada.slice(0, MAX_PER_RED - 1);
     const idsPromovidos = new Set(aPromover.map(p => p.id));
 
-    nuevaRed.jugadores = aPromover.map(({ _redId, ...p }) => p);
+    nuevaRed.jugadores = aPromover;
 
-    const redesActualizadas = prev.redes.map(r => ({
-      ...r,
-      espera: r.espera.filter(p => !idsPromovidos.has(p.id))
-    }));
-
-    return { ...prev, redes: [...redesActualizadas, nuevaRed] };
+    return {
+      ...prev,
+      espera: (prev.espera || []).filter(p => !idsPromovidos.has(p.id)),
+      redes: [...prev.redes, nuevaRed]
+    };
   });
   showNotify(`🏐 Nueva ${nuevoNumero}ª red abierta para el ${formatFechaLarga(fecha)}. ¡Apuntaos aquí! ${urlParaFecha(fecha)}`);
 }
@@ -882,68 +888,78 @@ function setMaterial(fecha, redId, tipo, nombre) {
 }
 
 function joinRed(fecha, redId, nombre, hora) {
-  updateLista(fecha, prev => ({
-    ...prev,
-    redes: prev.redes.map(r => {
-      if (r.id !== redId) return r;
-      const entry = { id: uid(), nombre, hora };
-      if (r.jugadores.length < MAX_PER_RED) {
-        return { ...r, jugadores: [...r.jugadores, entry] };
-      }
-      return { ...r, espera: [...r.espera, entry] };
-    })
-  }));
+  updateLista(fecha, prev => {
+    const entry = { id: uid(), nombre, hora, ts: Date.now() };
+    const red = prev.redes.find(r => r.id === redId);
+    if (red && red.jugadores.length < MAX_PER_RED) {
+      return {
+        ...prev,
+        redes: prev.redes.map(r => r.id === redId
+          ? { ...r, jugadores: [...r.jugadores, entry] }
+          : r)
+      };
+    }
+    return { ...prev, espera: [...(prev.espera || []), entry] };
+  });
 }
 
-function updateHora(fecha, redId, entryId, fromWaitlist, nuevaHora) {
+function updateHora(fecha, redId, entryId, nuevaHora) {
   const hora = nuevaHora || '—';
   updateLista(fecha, prev => ({
     ...prev,
-    redes: prev.redes.map(r => {
-      if (r.id !== redId) return r;
-      const campo = fromWaitlist ? 'espera' : 'jugadores';
-      return {
-        ...r,
-        [campo]: r[campo].map(p => p.id === entryId ? { ...p, hora } : p)
-      };
+    redes: prev.redes.map(r => r.id !== redId ? r : {
+      ...r,
+      jugadores: r.jugadores.map(p => p.id === entryId ? { ...p, hora } : p)
     })
   }));
 }
 
-function removeFromRed(fecha, redId, entryId, fromWaitlist) {
-  const lista = getLista(fecha);
-  const red = lista.redes.find(r => r.id === redId);
-  const listaPersonas = fromWaitlist ? red?.espera : red?.jugadores;
-  const persona = listaPersonas?.find(p => p.id === entryId);
-  const nombre = persona ? persona.nombre : 'esta persona';
-  if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
+function updateHoraEspera(fecha, entryId, nuevaHora) {
+  const hora = nuevaHora || '—';
   updateLista(fecha, prev => ({
     ...prev,
-    redes: prev.redes.map(r => {
-      if (r.id !== redId) return r;
-      if (fromWaitlist) {
-        return { ...r, espera: r.espera.filter(e => e.id !== entryId) };
-      }
-      const jugadores = r.jugadores.filter(e => e.id !== entryId);
-      let espera = r.espera;
-      if (jugadores.length < MAX_PER_RED && espera.length > 0) {
-        const [promoted, ...rest] = espera;
-        jugadores.push(promoted);
-        espera = rest;
-      }
-      return { ...r, jugadores, espera };
-    })
+    espera: (prev.espera || []).map(p => p.id === entryId ? { ...p, hora } : p)
   }));
+}
+
+function removeFromRed(fecha, redId, entryId) {
+  const lista = getLista(fecha);
+  const red = lista.redes.find(r => r.id === redId);
+  const persona = red?.jugadores.find(p => p.id === entryId);
+  const nombre = persona ? persona.nombre : 'esta persona';
+  if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
+  updateLista(fecha, prev => {
+    const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    return {
+      ...prev,
+      espera: esperaOrdenada.slice(1),
+      redes: prev.redes.map(r => {
+        if (r.id !== redId) return r;
+        const jugadores = r.jugadores.filter(e => e.id !== entryId);
+        if (esperaOrdenada.length > 0) jugadores.push(esperaOrdenada[0]);
+        return { ...r, jugadores };
+      })
+    };
+  });
   showNotify(`❌ ${nombre} se ha quitado de la ${red?.numero}ª red del ${formatFechaLarga(fecha)}.`);
+}
+
+function removeFromEspera(fecha, entryId) {
+  const lista = getLista(fecha);
+  const persona = (lista.espera || []).find(p => p.id === entryId);
+  const nombre = persona ? persona.nombre : 'esta persona';
+  if (!confirm(`¿Quitar a ${nombre} de la lista de espera?`)) return;
+  updateLista(fecha, prev => ({
+    ...prev,
+    espera: (prev.espera || []).filter(p => p.id !== entryId)
+  }));
 }
 
 function getAllMembers(lista) {
   const set = new Set();
   const redes = (lista && Array.isArray(lista.redes)) ? lista.redes : [];
-  redes.forEach(r => {
-    (r.jugadores || []).forEach(j => set.add(j.nombre));
-    (r.espera || []).forEach(j => set.add(j.nombre));
-  });
+  redes.forEach(r => (r.jugadores || []).forEach(j => set.add(j.nombre)));
+  (lista && lista.espera || []).forEach(j => set.add(j.nombre));
   return [...set].sort();
 }
 
@@ -978,34 +994,18 @@ function renderRed(fecha, red, allMembers) {
         <div class="player-row">
           <span class="player-slot-num">${i + 1}</span>
           <span class="player-name">${esc(p.nombre)}</span>
-          <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', false, this.value)" />
-          <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}', false)" title="Quitar">✕</button>
+          <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', this.value)" />
+          <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}')" title="Quitar">✕</button>
         </div>`;
     } else {
       playersHtml += `<div class="empty-slot">${i + 1}. libre</div>`;
     }
   }
 
-  let waitlistHtml = '';
-  if (red.espera.length > 0) {
-    waitlistHtml = `
-      <div class="waitlist">
-        <div class="waitlist-title">Lista de espera</div>
-        ${red.espera.map((p, i) => `
-          <div class="waitlist-row">
-            <span class="player-slot-num">${i + 1}</span>
-            <span class="player-name">${esc(p.nombre)}</span>
-            <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', true, this.value)" />
-            <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}', true)" title="Quitar">✕</button>
-          </div>
-        `).join('')}
-      </div>`;
-  }
-
   const nameInputId = `name-${red.id}`;
   const timeInputId = `time-${red.id}`;
-  const placeholder = isClosed ? 'Apuntarme a lista de espera' : 'Tu nombre';
-  const btnLabel = isClosed ? 'Esperar' : 'Apuntarme';
+  const placeholder = isClosed ? 'Tu nombre (lista de espera)' : 'Tu nombre';
+  const btnLabel = isClosed ? 'A la espera' : 'Apuntarme';
 
   return `
     <div class="red-card ${isClosed ? 'closed' : ''}">
@@ -1034,8 +1034,24 @@ function renderRed(fecha, red, allMembers) {
         <input type="time" lang="es" id="${timeInputId}" />
         <button class="join-btn" type="button" onclick="handleJoinClick('${fecha}','${red.id}','${nameInputId}','${timeInputId}')">${btnLabel}</button>
       </div>
+    </div>
+  `;
+}
 
-      ${waitlistHtml}
+function renderEsperaGlobal(fecha, lista) {
+  const espera = (lista.espera || []).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  if (espera.length === 0) return '';
+  return `
+    <div class="waitlist-global">
+      <div class="waitlist-title">⏳ Lista de espera general (${espera.length})</div>
+      ${espera.map((p, i) => `
+        <div class="waitlist-row">
+          <span class="player-slot-num">${i + 1}</span>
+          <span class="player-name">${esc(p.nombre)}</span>
+          <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHoraEspera('${fecha}','${p.id}', this.value)" />
+          <button class="player-remove" onclick="removeFromEspera('${fecha}','${p.id}')" title="Quitar">✕</button>
+        </div>
+      `).join('')}
     </div>
   `;
 }
@@ -1182,6 +1198,7 @@ function renderListView() {
       <button class="add-red-btn" onclick="addRed('${fecha}')">+ Nueva red</button>
       <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
       ${redesHtml}
+      ${renderEsperaGlobal(fecha, lista)}
       <button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:8px;" onclick="deleteLista('${fecha}')">🗑 Borrar esta lista</button>
     </div>
   `;
@@ -1235,6 +1252,12 @@ function renderNotifyModal() {
 function sanitizeLista(l) {
   const lugar = (l && typeof l.lugar === 'string') ? l.lugar : '';
   const redesRaw = (l && Array.isArray(l.redes)) ? l.redes : [];
+
+  // Migración: recoger esperas antiguas por red y subirlas al nivel de lista
+  const esperaHeredada = redesRaw.flatMap(r => Array.isArray(r.espera) ? r.espera : []);
+  const esperaPropia = Array.isArray(l && l.espera) ? l.espera : [];
+  const espera = [...esperaPropia, ...esperaHeredada].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
   const redes = redesRaw.map((r, i) => ({
     id: r.id || uid(),
     numero: r.numero || (i + 1),
@@ -1243,10 +1266,9 @@ function sanitizeLista(l) {
       red: (r.materiales && r.materiales.red) || '',
       lineas: (r.materiales && r.materiales.lineas) || ''
     },
-    jugadores: Array.isArray(r.jugadores) ? r.jugadores : [],
-    espera: Array.isArray(r.espera) ? r.espera : []
+    jugadores: Array.isArray(r.jugadores) ? r.jugadores : []
   }));
-  return { lugar, redes };
+  return { lugar, espera, redes };
 }
 
 function sanitizeState(s) {
