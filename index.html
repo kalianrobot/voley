@@ -822,7 +822,20 @@ function addRed(fecha) {
   let nuevoNumero = 0;
   updateLista(fecha, prev => {
     nuevoNumero = prev.redes.length + 1;
-    return { ...prev, redes: [...prev.redes, newRed(nuevoNumero)] };
+    const nuevaRed = newRed(nuevoNumero);
+
+    const todosEnEspera = prev.redes.flatMap(r => r.espera.map(p => ({ ...p, _redId: r.id })));
+    const aPromover = todosEnEspera.slice(0, MAX_PER_RED - 1);
+    const idsPromovidos = new Set(aPromover.map(p => p.id));
+
+    nuevaRed.jugadores = aPromover.map(({ _redId, ...p }) => p);
+
+    const redesActualizadas = prev.redes.map(r => ({
+      ...r,
+      espera: r.espera.filter(p => !idsPromovidos.has(p.id))
+    }));
+
+    return { ...prev, redes: [...redesActualizadas, nuevaRed] };
   });
   showNotify(`🏐 Nueva ${nuevoNumero}ª red abierta para el ${formatFechaLarga(fecha)}. ¡Apuntaos aquí! ${urlParaFecha(fecha)}`);
 }
