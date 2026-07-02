@@ -630,6 +630,52 @@
   padding: 14px 18px 16px;
   margin-bottom: 22px;
 }
+
+.historial-section {
+  margin-bottom: 22px;
+}
+
+.historial-toggle {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--sand);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: 'Sora', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sea-deep);
+  text-align: left;
+  cursor: pointer;
+}
+
+.historial-list {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 14px;
+  background: rgba(0,0,0,0.02);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.historial-row {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.historial-row:last-child { border-bottom: none; }
+
+.historial-hora {
+  color: var(--ink);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.historial-texto { color: var(--ink); }
 </style>
 
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -671,6 +717,7 @@ let showNewListModal = false;
 let showNewRedModal = false;
 let newRedData = { fecha: null, nombre: '', balon: '', lineas: '' };
 let notifyMessage = null;
+let showHistorial = false;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -706,7 +753,14 @@ function newRed(num) {
 }
 
 function emptyLista() {
-  return { lugar: '', espera: [], redes: [] };
+  return { lugar: '', espera: [], redes: [], historial: [] };
+}
+
+const HISTORIAL_MAX = 30;
+
+function agregarHistorial(historial, texto) {
+  const entradas = [...(historial || []), { ts: Date.now(), texto }];
+  return entradas.slice(-HISTORIAL_MAX);
 }
 
 function todayStr() {
@@ -814,6 +868,12 @@ function goToCalendar() {
 
 function openLista(fecha) {
   view = { screen: 'list', fecha };
+  showHistorial = false;
+  render();
+}
+
+function toggleHistorial() {
+  showHistorial = !showHistorial;
   render();
 }
 
@@ -919,7 +979,8 @@ async function confirmNewRed() {
     return {
       ...prev,
       espera: (prev.espera || []).filter(p => !idsPromovidos.has(p.id)),
-      redes: [...prev.redes, nuevaRed]
+      redes: [...prev.redes, nuevaRed],
+      historial: agregarHistorial(prev.historial, `🏐 ${nombre} creó la ${nuevoNumero}ª red`)
     };
   });
 
@@ -1024,6 +1085,10 @@ async function removeFromRed(fecha, redId, entryId) {
     }
   }
 
+  const textoHistorial = esPropia
+    ? `➖ ${nombre} se quitó de la ${red.numero}ª red`
+    : `➖ ${red.materiales.red || 'El creador'} quitó a ${nombre} de la ${red.numero}ª red`;
+
   let nombrePromovido = null;
   await updateLista(fecha, prev => {
     const esperaOrdenada = [...(prev.espera || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
@@ -1036,7 +1101,8 @@ async function removeFromRed(fecha, redId, entryId) {
         const jugadores = r.jugadores.filter(e => e.id !== entryId);
         if (esperaOrdenada.length > 0) jugadores.push(esperaOrdenada[0]);
         return { ...r, jugadores };
-      })
+      }),
+      historial: agregarHistorial(prev.historial, textoHistorial)
     };
   });
 
@@ -1069,9 +1135,19 @@ function removeFromEspera(fecha, entryId) {
     }
   }
 
+  let textoHistorial;
+  if (esPropia) {
+    textoHistorial = `➖ ${nombre} se quitó de la lista de espera`;
+  } else {
+    const redCreador = (lista.redes || []).find(r => r.creatorOwner === DEVICE_ID);
+    const autor = (redCreador && redCreador.materiales.red) || 'El creador de una red';
+    textoHistorial = `➖ ${autor} quitó a ${nombre} de la lista de espera`;
+  }
+
   updateLista(fecha, prev => ({
     ...prev,
-    espera: (prev.espera || []).filter(p => p.id !== entryId)
+    espera: (prev.espera || []).filter(p => p.id !== entryId),
+    historial: agregarHistorial(prev.historial, textoHistorial)
   }));
 }
 
@@ -1193,6 +1269,26 @@ function renderEsperaGlobal(fecha, lista) {
           ${puedeGestionarEspera(lista, p) ? `<button class="player-remove" onclick="removeFromEspera('${fecha}','${p.id}')" title="Quitar">✕</button>` : ''}
         </div>
       `).join('')}
+    </div>
+  `;
+}
+
+function renderHistorial(lista) {
+  const historial = lista.historial || [];
+  if (historial.length === 0) return '';
+  const ordenado = [...historial].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const filas = ordenado.map(h => `
+    <div class="historial-row">
+      <span class="historial-hora">${new Date(h.ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+      <span class="historial-texto">${esc(h.texto)}</span>
+    </div>
+  `).join('');
+  return `
+    <div class="historial-section">
+      <button class="historial-toggle" onclick="toggleHistorial()">
+        📜 Historial (${historial.length}) ${showHistorial ? '▲' : '▼'}
+      </button>
+      ${showHistorial ? `<div class="historial-list">${filas}</div>` : ''}
     </div>
   `;
 }
@@ -1413,6 +1509,7 @@ function renderListView() {
       <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
       ${redesHtml}
       ${renderEsperaGlobal(fecha, lista)}
+      ${renderHistorial(lista)}
       <button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:8px;" onclick="deleteLista('${fecha}')">🗑 Borrar esta lista</button>
     </div>
   `;
@@ -1483,7 +1580,8 @@ function sanitizeLista(l) {
     jugadores: Array.isArray(r.jugadores) ? r.jugadores : [],
     creatorOwner: r.creatorOwner || null
   }));
-  return { lugar, espera, redes };
+  const historial = Array.isArray(l && l.historial) ? l.historial : [];
+  return { lugar, espera, redes, historial };
 }
 
 function sanitizeState(s) {
