@@ -676,6 +676,21 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem('voley_device_id');
+    if (!id) {
+      id = uid() + uid();
+      localStorage.setItem('voley_device_id', id);
+    }
+    return id;
+  } catch (e) {
+    return uid() + uid(); // localStorage no disponible: identidad efímera
+  }
+}
+
+const DEVICE_ID = getDeviceId();
+
 function emptyState() {
   return { listas: {} };
 }
@@ -685,7 +700,8 @@ function newRed(num) {
     id: uid(),
     numero: num,
     materiales: { balon: '', red: '', lineas: '' },
-    jugadores: []
+    jugadores: [],
+    creatorOwner: DEVICE_ID
   };
 }
 
@@ -889,15 +905,15 @@ async function confirmNewRed() {
 
     nuevaRed.jugadores = aPromover.slice();
 
-    const creador = { id: uid(), nombre, hora: '—', ts: Date.now() };
+    const creador = { id: uid(), nombre, hora: '—', ts: Date.now(), owner: DEVICE_ID };
     nuevaRed.jugadores.unshift(creador);
 
     if (balon.trim() !== nombre && nuevaRed.jugadores.length < MAX_PER_RED) {
-      nuevaRed.jugadores.push({ id: uid(), nombre: balon, hora: '—', ts: Date.now() });
+      nuevaRed.jugadores.push({ id: uid(), nombre: balon, hora: '—', ts: Date.now(), owner: DEVICE_ID });
     }
 
     if (lineas.trim() !== nombre && lineas.trim() !== balon && nuevaRed.jugadores.length < MAX_PER_RED) {
-      nuevaRed.jugadores.push({ id: uid(), nombre: lineas, hora: '—', ts: Date.now() });
+      nuevaRed.jugadores.push({ id: uid(), nombre: lineas, hora: '—', ts: Date.now(), owner: DEVICE_ID });
     }
 
     return {
@@ -952,7 +968,7 @@ function setMaterial(fecha, redId, tipo, nombre) {
 
 function joinRed(fecha, redId, nombre, hora) {
   updateLista(fecha, prev => {
-    const entry = { id: uid(), nombre, hora, ts: Date.now() };
+    const entry = { id: uid(), nombre, hora, ts: Date.now(), owner: DEVICE_ID };
     const red = prev.redes.find(r => r.id === redId);
     if (red && red.jugadores.length < MAX_PER_RED) {
       return {
@@ -990,7 +1006,23 @@ async function removeFromRed(fecha, redId, entryId) {
   const red = lista.redes.find(r => r.id === redId);
   const persona = red?.jugadores.find(p => p.id === entryId);
   const nombre = persona ? persona.nombre : 'esta persona';
-  if (!confirm(`¿Quitar a ${nombre} de la ${red?.numero}ª red?`)) return;
+
+  if (!red || !puedeGestionarRed(red, persona)) {
+    alert('Solo esa persona puede quitarse a sí misma, o quien creó la red.');
+    return;
+  }
+
+  const esPropia = persona && persona.owner === DEVICE_ID;
+  if (esPropia) {
+    if (!confirm(`¿Quitarte de la ${red.numero}ª red?`)) return;
+  } else {
+    const escrito = prompt(`Para quitar a ${nombre} de la ${red.numero}ª red, escribe su nombre exacto:`);
+    if (escrito === null) return;
+    if (escrito.trim() !== nombre.trim()) {
+      alert('El nombre no coincide. No se ha quitado a nadie.');
+      return;
+    }
+  }
 
   let nombrePromovido = null;
   await updateLista(fecha, prev => {
@@ -1019,7 +1051,24 @@ function removeFromEspera(fecha, entryId) {
   const lista = getLista(fecha);
   const persona = (lista.espera || []).find(p => p.id === entryId);
   const nombre = persona ? persona.nombre : 'esta persona';
-  if (!confirm(`¿Quitar a ${nombre} de la lista de espera?`)) return;
+
+  if (!puedeGestionarEspera(lista, persona)) {
+    alert('Solo esa persona puede quitarse a sí misma, o quien haya creado una red de esa lista.');
+    return;
+  }
+
+  const esPropia = persona && persona.owner === DEVICE_ID;
+  if (esPropia) {
+    if (!confirm('¿Quitarte de la lista de espera?')) return;
+  } else {
+    const escrito = prompt(`Para quitar a ${nombre} de la lista de espera, escribe su nombre exacto:`);
+    if (escrito === null) return;
+    if (escrito.trim() !== nombre.trim()) {
+      alert('El nombre no coincide. No se ha quitado a nadie.');
+      return;
+    }
+  }
+
   updateLista(fecha, prev => ({
     ...prev,
     espera: (prev.espera || []).filter(p => p.id !== entryId)
@@ -1032,6 +1081,24 @@ function getAllMembers(lista) {
   redes.forEach(r => (r.jugadores || []).forEach(j => set.add(j.nombre)));
   (lista && lista.espera || []).forEach(j => set.add(j.nombre));
   return [...set].sort();
+}
+
+/* ---------- Permisos: quién puede quitar a quién ---------- */
+
+// Redes sin creatorOwner son de antes de esta funcionalidad: se mantiene
+// el comportamiento anterior (cualquiera puede gestionarlas) para no
+// bloquear listas ya existentes.
+function puedeGestionarRed(red, persona) {
+  if (persona && persona.owner === DEVICE_ID) return true;
+  if (!red.creatorOwner) return true;
+  return red.creatorOwner === DEVICE_ID;
+}
+
+function puedeGestionarEspera(lista, persona) {
+  if (persona && persona.owner === DEVICE_ID) return true;
+  const redesConCreador = (lista.redes || []).filter(r => r.creatorOwner);
+  if (redesConCreador.length === 0) return true;
+  return redesConCreador.some(r => r.creatorOwner === DEVICE_ID);
 }
 
 /* ---------- Render: chips, redes ---------- */
@@ -1061,12 +1128,15 @@ function renderRed(fecha, red, allMembers) {
   for (let i = 0; i < MAX_PER_RED; i++) {
     const p = red.jugadores[i];
     if (p) {
+      const removeBtn = puedeGestionarRed(red, p)
+        ? `<button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}')" title="Quitar">✕</button>`
+        : '';
       playersHtml += `
         <div class="player-row">
           <span class="player-slot-num">${i + 1}</span>
           <span class="player-name">${esc(p.nombre)}</span>
           <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHora('${fecha}','${red.id}','${p.id}', this.value)" />
-          <button class="player-remove" onclick="removeFromRed('${fecha}','${red.id}','${p.id}')" title="Quitar">✕</button>
+          ${removeBtn}
         </div>`;
     } else {
       playersHtml += `<div class="empty-slot">${i + 1}. libre</div>`;
@@ -1120,7 +1190,7 @@ function renderEsperaGlobal(fecha, lista) {
           <span class="player-slot-num">${i + 1}</span>
           <span class="player-name">${esc(p.nombre)}</span>
           <input type="time" lang="es" class="player-time-input" value="${esc(p.hora === '—' ? '' : p.hora)}" onchange="updateHoraEspera('${fecha}','${p.id}', this.value)" />
-          <button class="player-remove" onclick="removeFromEspera('${fecha}','${p.id}')" title="Quitar">✕</button>
+          ${puedeGestionarEspera(lista, p) ? `<button class="player-remove" onclick="removeFromEspera('${fecha}','${p.id}')" title="Quitar">✕</button>` : ''}
         </div>
       `).join('')}
     </div>
@@ -1157,7 +1227,7 @@ function handleJoinEspera(fecha, nameInputId, timeInputId) {
   const hora = (timeInput && timeInput.value) || '—';
   updateLista(fecha, prev => ({
     ...prev,
-    espera: [...(prev.espera || []), { id: uid(), nombre, hora, ts: Date.now() }]
+    espera: [...(prev.espera || []), { id: uid(), nombre, hora, ts: Date.now(), owner: DEVICE_ID }]
   }));
   nameInput.value = '';
   if (timeInput) timeInput.value = '';
@@ -1410,7 +1480,8 @@ function sanitizeLista(l) {
       red: (r.materiales && r.materiales.red) || '',
       lineas: (r.materiales && r.materiales.lineas) || ''
     },
-    jugadores: Array.isArray(r.jugadores) ? r.jugadores : []
+    jugadores: Array.isArray(r.jugadores) ? r.jugadores : [],
+    creatorOwner: r.creatorOwner || null
   }));
   return { lugar, espera, redes };
 }
