@@ -278,12 +278,12 @@
   background: none;
   border: none;
   color: var(--ink);
-  opacity: 0.3;
+  opacity: 0.5;
   cursor: pointer;
   font-size: 15px;
   padding: 2px 6px;
 }
-.player-remove:hover { opacity: 0.75; }
+.player-remove:hover { opacity: 1; color: var(--coral); }
 
 .empty-slot {
   padding: 9px 0;
@@ -545,6 +545,30 @@
 .add-list-btn:hover { background: rgba(27,94,99,0.06); }
 .add-list-btn:active { transform: scale(0.99); }
 
+.admin-toggle {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  opacity: 0.6;
+  font-family: 'Sora', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.admin-toggle:hover { opacity: 1; background: rgba(31,42,46,0.04); }
+
+.admin-toggle.active {
+  opacity: 1;
+  border-color: rgba(27,94,99,0.4);
+  background: rgba(27,94,99,0.08);
+  color: var(--sea-deep);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -746,6 +770,39 @@ function getDeviceId() {
 }
 
 const DEVICE_ID = getDeviceId();
+
+// PIN de administrador. OJO: al ser una web estática pública, este PIN es
+// visible en el código fuente. Solo evita borrados accidentales o de gente
+// ajena al grupo; no es seguridad real. Cámbialo por el que quieras.
+const ADMIN_PIN = '1234';
+
+function isAdminStored() {
+  try {
+    return localStorage.getItem('voley_admin') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+let isAdmin = isAdminStored();
+
+function loginAdmin() {
+  const pin = prompt('Introduce el PIN de admin:');
+  if (pin === null) return;
+  if (pin.trim() !== ADMIN_PIN) {
+    alert('PIN incorrecto.');
+    return;
+  }
+  isAdmin = true;
+  try { localStorage.setItem('voley_admin', '1'); } catch (e) {}
+  render();
+}
+
+function logoutAdmin() {
+  isAdmin = false;
+  try { localStorage.removeItem('voley_admin'); } catch (e) {}
+  render();
+}
 
 function emptyState() {
   return { listas: {} };
@@ -1081,7 +1138,7 @@ async function removeFromRed(fecha, redId, entryId) {
   const nombre = persona ? persona.nombre : 'esta persona';
 
   if (!red || !puedeGestionarRed(red, persona)) {
-    alert('Solo esa persona puede quitarse a sí misma, o quien creó la red.');
+    alert('Solo esa persona, el creador de la red o un admin pueden quitar a alguien.');
     return;
   }
 
@@ -1089,17 +1146,12 @@ async function removeFromRed(fecha, redId, entryId) {
   if (esPropia) {
     if (!confirm(`¿Quitarte de la ${red.numero}ª red?`)) return;
   } else {
-    const escrito = prompt(`Para quitar a ${nombre} de la ${red.numero}ª red, escribe su nombre exacto:`);
-    if (escrito === null) return;
-    if (escrito.trim() !== nombre.trim()) {
-      alert('El nombre no coincide. No se ha quitado a nadie.');
-      return;
-    }
+    if (!confirm(`¿Quitar a ${nombre} de la ${red.numero}ª red?`)) return;
   }
 
   const textoHistorial = esPropia
     ? `➖ ${nombre} se quitó de la ${red.numero}ª red`
-    : `➖ ${red.materiales.red || 'El creador'} quitó a ${nombre} de la ${red.numero}ª red`;
+    : `➖ Se quitó a ${nombre} de la ${red.numero}ª red`;
 
   let nombrePromovido = null;
   await updateLista(fecha, prev => {
@@ -1131,7 +1183,7 @@ function removeFromEspera(fecha, entryId) {
   const nombre = persona ? persona.nombre : 'esta persona';
 
   if (!puedeGestionarEspera(lista, persona)) {
-    alert('Solo esa persona puede quitarse a sí misma, o quien haya creado una red de esa lista.');
+    alert('Solo esa persona, el creador de una red o un admin pueden quitar a alguien.');
     return;
   }
 
@@ -1139,22 +1191,12 @@ function removeFromEspera(fecha, entryId) {
   if (esPropia) {
     if (!confirm('¿Quitarte de la lista de espera?')) return;
   } else {
-    const escrito = prompt(`Para quitar a ${nombre} de la lista de espera, escribe su nombre exacto:`);
-    if (escrito === null) return;
-    if (escrito.trim() !== nombre.trim()) {
-      alert('El nombre no coincide. No se ha quitado a nadie.');
-      return;
-    }
+    if (!confirm(`¿Quitar a ${nombre} de la lista de espera?`)) return;
   }
 
-  let textoHistorial;
-  if (esPropia) {
-    textoHistorial = `➖ ${nombre} se quitó de la lista de espera`;
-  } else {
-    const redCreador = (lista.redes || []).find(r => r.creatorOwner === DEVICE_ID);
-    const autor = (redCreador && redCreador.materiales.red) || 'El creador de una red';
-    textoHistorial = `➖ ${autor} quitó a ${nombre} de la lista de espera`;
-  }
+  const textoHistorial = esPropia
+    ? `➖ ${nombre} se quitó de la lista de espera`
+    : `➖ Se quitó a ${nombre} de la lista de espera`;
 
   updateLista(fecha, prev => ({
     ...prev,
@@ -1177,12 +1219,14 @@ function getAllMembers(lista) {
 // el comportamiento anterior (cualquiera puede gestionarlas) para no
 // bloquear listas ya existentes.
 function puedeGestionarRed(red, persona) {
+  if (isAdmin) return true;
   if (persona && persona.owner === DEVICE_ID) return true;
   if (!red.creatorOwner) return true;
   return red.creatorOwner === DEVICE_ID;
 }
 
 function puedeGestionarEspera(lista, persona) {
+  if (isAdmin) return true;
   if (persona && persona.owner === DEVICE_ID) return true;
   const redesConCreador = (lista.redes || []).filter(r => r.creatorOwner);
   if (redesConCreador.length === 0) return true;
@@ -1416,6 +1460,9 @@ function renderCalendar() {
         <div class="cal-days">${daysHtml}</div>
       </div>
       <button class="add-list-btn" onclick="openNewListModal()">+ Nueva lista</button>
+      ${isAdmin
+        ? `<button class="admin-toggle active" onclick="logoutAdmin()">🔓 Admin activo · salir</button>`
+        : `<button class="admin-toggle" onclick="loginAdmin()">🔑 Modo admin</button>`}
     </div>
   `;
 }
