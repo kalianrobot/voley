@@ -1143,10 +1143,14 @@ async function removeFromRed(fecha, redId, entryId) {
   }
 
   const esPropia = persona && persona.owner === DEVICE_ID;
-  if (esPropia) {
-    if (!confirm(`¿Quitarte de la ${red.numero}ª red?`)) return;
-  } else {
-    if (!confirm(`¿Quitar a ${nombre} de la ${red.numero}ª red?`)) return;
+  const aviso = esPropia
+    ? `Para quitarte de la ${red.numero}ª red, escribe tu nombre exacto:`
+    : `Para quitar a ${nombre} de la ${red.numero}ª red, escribe su nombre exacto:`;
+  const escrito = prompt(aviso);
+  if (escrito === null) return;
+  if (escrito.trim() !== nombre.trim()) {
+    alert('El nombre no coincide. No se ha quitado a nadie.');
+    return;
   }
 
   const textoHistorial = esPropia
@@ -1188,10 +1192,14 @@ function removeFromEspera(fecha, entryId) {
   }
 
   const esPropia = persona && persona.owner === DEVICE_ID;
-  if (esPropia) {
-    if (!confirm('¿Quitarte de la lista de espera?')) return;
-  } else {
-    if (!confirm(`¿Quitar a ${nombre} de la lista de espera?`)) return;
+  const aviso = esPropia
+    ? 'Para quitarte de la lista de espera, escribe tu nombre exacto:'
+    : `Para quitar a ${nombre} de la lista de espera, escribe su nombre exacto:`;
+  const escrito = prompt(aviso);
+  if (escrito === null) return;
+  if (escrito.trim() !== nombre.trim()) {
+    alert('El nombre no coincide. No se ha quitado a nadie.');
+    return;
   }
 
   const textoHistorial = esPropia
