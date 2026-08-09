@@ -507,6 +507,24 @@
   box-shadow: inset 0 0 0 2px var(--coral);
 }
 
+.cal-day.has-torneo {
+  opacity: 1;
+  background: rgba(176,134,66,0.2);
+  color: var(--waiting);
+}
+.cal-day.has-torneo.has-list {
+  background: linear-gradient(135deg, rgba(27,94,99,0.14) 50%, rgba(176,134,66,0.25) 50%);
+  color: var(--sea-deep);
+}
+
+.cal-day-torneo {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  line-height: 1;
+}
+
 .cal-day .dot {
   position: absolute;
   bottom: 4px;
@@ -725,6 +743,13 @@
   margin-bottom: 6px;
 }
 
+.torneo-card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .torneo-card-nombre {
   font-family: 'Fraunces', serif;
   font-weight: 600;
@@ -744,6 +769,19 @@
 .torneo-badge.upcoming { background: rgba(176,134,66,0.12); color: var(--waiting); }
 .torneo-badge.live { background: rgba(27,94,99,0.1); color: var(--sea); }
 .torneo-badge.done { background: rgba(31,42,46,0.08); color: var(--ink); opacity: 0.6; }
+
+.delete-torneo {
+  background: none;
+  border: none;
+  color: var(--ink);
+  opacity: 0.35;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  transition: opacity 0.15s, background 0.15s;
+}
+.delete-torneo:hover { opacity: 0.8; background: rgba(31,42,46,0.06); color: var(--coral); }
 
 .torneo-card-meta { font-size: 13px; opacity: 0.75; margin-bottom: 4px; }
 .torneo-card-fechas { font-size: 12.5px; opacity: 0.55; }
@@ -1123,6 +1161,15 @@ function faseTorneo(torneo) {
   const final = torneo.eliminatoria.rondas[torneo.eliminatoria.rondas.length - 1];
   const acabado = final && final.partidos.every(p => p.ganadorId);
   return acabado ? 'Finalizado' : 'Eliminatorias';
+}
+
+// fecha: 'YYYY-MM-DD'. Compara solo la parte de fecha de fechaInicio/fechaFin
+// ('YYYY-MM-DDTHH:mm'), así que la comparación lexicográfica de prefijos basta.
+function torneosEnFecha(fecha) {
+  return Object.values(state.torneos || {}).filter(t => {
+    if (!t.fechaInicio || !t.fechaFin) return false;
+    return fecha >= t.fechaInicio.slice(0, 10) && fecha <= t.fechaFin.slice(0, 10);
+  });
 }
 
 async function runUpdate(updater, opts = {}) {
@@ -2009,12 +2056,15 @@ function deleteTorneo(torneoId) {
   const torneo = getTorneo(torneoId);
   if (!torneo) return;
   if (!confirm(`¿Borrar el torneo "${torneo.nombre}"? Se perderá toda la información: equipos, grupos y eliminatorias.`)) return;
+  const estabaViendolo = view.screen === 'torneo' && view.torneoId === torneoId;
   update(prev => {
     const torneos = { ...prev.torneos };
     delete torneos[torneoId];
     return { ...prev, torneos };
   });
-  goToCalendar();
+  // Si se borra desde su propia vista hay que volver al calendario; si se borra
+  // desde la tarjeta del calendario, update() ya vuelve a renderizar sin tocar el mes que se estaba viendo.
+  if (estabaViendolo) goToCalendar();
 }
 
 function puedeGestionarTorneo(torneo) {
@@ -2228,10 +2278,13 @@ function renderCalendar() {
 
   const daysHtml = cells.map(cell => {
     const hasList = cell.key && state.listas[cell.key];
+    const torneosDia = cell.key ? torneosEnFecha(cell.key) : [];
+    const hasTorneo = torneosDia.length > 0;
     const isToday = cell.key === today;
     const classes = ['cal-day'];
     if (cell.inMonth) classes.push('in-month');
     if (hasList) classes.push('has-list');
+    if (hasTorneo) classes.push('has-torneo');
     if (isToday) classes.push('is-today');
     const onclick = hasList ? `onclick="openLista('${cell.key}')"` : '';
 
@@ -2251,8 +2304,9 @@ function renderCalendar() {
         esperaCount = `<div class="cal-day-espera">${lista.espera.length} en espera</div>`;
       }
     }
+    const torneoMarca = hasTorneo ? `<span class="cal-day-torneo" title="${esc(torneosDia.map(t => t.nombre).join(', '))}">🏆</span>` : '';
 
-    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${indicadores}${esperaCount}</div>`;
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${torneoMarca}${indicadores}${esperaCount}</div>`;
   }).join('');
 
   const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
@@ -2398,11 +2452,17 @@ function renderTorneosSection() {
   const cards = torneos.map(t => {
     const badge = estadoTorneo(t);
     const badgeClass = badge === 'En curso' ? 'live' : (badge === 'Finalizado' ? 'done' : 'upcoming');
+    const deleteBtn = puedeGestionarTorneo(t)
+      ? `<button class="delete-torneo" onclick="event.stopPropagation(); deleteTorneo('${t.id}')" title="Borrar torneo">✕</button>`
+      : '';
     return `
       <div class="torneo-card" onclick="openTorneo('${t.id}')">
         <div class="torneo-card-head">
           <span class="torneo-card-nombre">${esc(t.nombre)}</span>
-          <span class="torneo-badge ${badgeClass}">${badge}</span>
+          <span class="torneo-card-head-right">
+            <span class="torneo-badge ${badgeClass}">${badge}</span>
+            ${deleteBtn}
+          </span>
         </div>
         <div class="torneo-card-meta">🏐 ${esc(t.categoria)} · 👥 ${t.equipos.length} equipos · ${faseTorneo(t)}</div>
         <div class="torneo-card-fechas">${formatRangoFechasTorneo(t)}</div>
