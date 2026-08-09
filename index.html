@@ -700,6 +700,165 @@
 }
 
 .historial-texto { color: var(--ink); }
+
+/* --- Torneos --- */
+
+.torneos-section { margin-top: 4px; }
+
+.torneo-card {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 0 var(--sand-deep), 0 8px 24px -12px rgba(14,59,64,0.25);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.torneo-card:active { transform: scale(0.99); }
+
+.torneo-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.torneo-card-nombre {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--sea-deep);
+}
+
+.torneo-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.torneo-badge.upcoming { background: rgba(176,134,66,0.12); color: var(--waiting); }
+.torneo-badge.live { background: rgba(27,94,99,0.1); color: var(--sea); }
+.torneo-badge.done { background: rgba(31,42,46,0.08); color: var(--ink); opacity: 0.6; }
+
+.torneo-card-meta { font-size: 13px; opacity: 0.75; margin-bottom: 4px; }
+.torneo-card-fechas { font-size: 12.5px; opacity: 0.55; }
+
+.labeled-field { margin-bottom: 14px; }
+.labeled-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sea);
+  display: block;
+  margin-bottom: 4px;
+}
+.labeled-field input,
+.labeled-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  outline: none;
+  background: var(--sand);
+}
+
+.equipo-input-row { margin-bottom: 8px; }
+
+.modal-error {
+  font-size: 12.5px;
+  color: var(--coral);
+  background: rgba(232,105,74,0.1);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.grupo-card { margin-bottom: 22px; }
+
+.grupo-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+.grupo-standings-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.45;
+  padding: 4px 6px;
+}
+.grupo-standings-table td { padding: 6px; border-top: 1px solid rgba(31,42,46,0.06); }
+.grupo-standings-table tr.clasificado td { font-weight: 700; color: var(--sea-deep); }
+
+.bracket-container {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 14px;
+  min-width: 190px;
+  flex-shrink: 0;
+}
+
+.bracket-round-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--sea-deep);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.bracket-match {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 0 var(--sand-deep);
+}
+
+.bracket-team {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.bracket-team.winner { color: var(--sea-deep); }
+.bracket-team:not(.winner) { opacity: 0.75; }
+
+.bracket-set-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  opacity: 0.8;
+  margin-top: 6px;
+}
+.bracket-set-row input {
+  width: 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 4px;
+  font-family: 'Sora', sans-serif;
+  font-size: 12px;
+  text-align: center;
+  background: var(--sand);
+  outline: none;
+}
 </style>
 
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -739,18 +898,22 @@ function urlParaFecha(fecha) {
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
+const CATEGORIAS_TORNEO = ['masculino', 'femenino', 'mixto'];
+const PUNTOS_POR_SET_DEFAULT = 15;
 
-let state = null;        // { listas: { 'YYYY-MM-DD': { lugar, redes } } }
+let state = null;        // { listas: { 'YYYY-MM-DD': { lugar, redes } }, torneos: { id: Torneo } }
 let loading = true;
 let saving = false;
 
-// vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha }
+// vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha } o { screen: 'torneo', torneoId }
 let view = { screen: 'calendar', calYear: null, calMonth: null };
 let showNewListModal = false;
 let showNewRedModal = false;
 let newRedData = { fecha: null, nombre: '', balon: '', lineas: '' };
 let notifyMessage = null;
 let showHistorial = false;
+let showNewTorneoModal = false;
+let newTorneoData = null; // se inicializa en openNewTorneoModal()
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -805,7 +968,32 @@ function logoutAdmin() {
 }
 
 function emptyState() {
-  return { listas: {} };
+  return { listas: {}, torneos: {} };
+}
+
+function newEquipo(nombre) {
+  return { id: uid(), nombre };
+}
+
+function emptyTorneo(datos) {
+  return {
+    id: uid(),
+    nombre: datos.nombre,
+    categoria: datos.categoria,
+    fechaInicio: datos.fechaInicio,
+    fechaFin: datos.fechaFin,
+    puntosPorSet: datos.puntosPorSet || PUNTOS_POR_SET_DEFAULT,
+    equipos: datos.equipos,
+    numGrupos: datos.numGrupos,
+    numPartidosGrupo: datos.numPartidosGrupo,
+    clasificadosPorGrupo: datos.clasificadosPorGrupo,
+    grupos: null,
+    sorteoConfirmado: false,
+    partidosGrupo: [],
+    eliminatoria: null,
+    creatorOwner: DEVICE_ID,
+    historial: []
+  };
 }
 
 function newRed(num) {
@@ -850,6 +1038,37 @@ function formatFechaLarga(key) {
   const d = parseDateKey(key);
   const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   return `${diasSemana[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
+}
+
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+// fechaHora: 'YYYY-MM-DDTHH:mm' (valor de un <input type="datetime-local">)
+function formatFechaHoraCorta(fechaHora) {
+  if (!fechaHora) return '';
+  const [fecha, hora] = fechaHora.split('T');
+  const [y, m, d] = fecha.split('-').map(Number);
+  return `${d} ${MESES_CORTOS[m - 1]} ${hora || ''}`.trim();
+}
+
+function formatRangoFechasTorneo(torneo) {
+  return `${formatFechaHoraCorta(torneo.fechaInicio)} – ${formatFechaHoraCorta(torneo.fechaFin)}`;
+}
+
+function estadoTorneo(torneo) {
+  const ahora = Date.now();
+  const inicio = torneo.fechaInicio ? new Date(torneo.fechaInicio).getTime() : null;
+  const fin = torneo.fechaFin ? new Date(torneo.fechaFin).getTime() : null;
+  if (inicio != null && ahora < inicio) return 'Próximo';
+  if (fin != null && ahora > fin) return 'Finalizado';
+  return 'En curso';
+}
+
+function faseTorneo(torneo) {
+  if (!torneo.grupos) return 'Sin sortear';
+  if (!torneo.eliminatoria) return 'Fase de grupos';
+  const final = torneo.eliminatoria.rondas[torneo.eliminatoria.rondas.length - 1];
+  const acabado = final && final.partidos.every(p => p.ganadorId);
+  return acabado ? 'Finalizado' : 'Eliminatorias';
 }
 
 async function runUpdate(updater, opts = {}) {
@@ -938,6 +1157,11 @@ function openLista(fecha) {
   render();
 }
 
+function openTorneo(torneoId) {
+  view = { screen: 'torneo', torneoId };
+  render();
+}
+
 function toggleHistorial() {
   showHistorial = !showHistorial;
   render();
@@ -983,6 +1207,193 @@ async function confirmNewList() {
   if (!yaExistia) {
     showNotify(`📅 Nueva lista creada para el ${formatFechaLarga(fecha)}. ¡Apuntaos! ${urlParaFecha(fecha)}`);
   }
+}
+
+/* ---------- Torneos: cálculo y sorteo ---------- */
+
+function esPotenciaDeDos(n) {
+  return Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
+}
+
+// Sugerencia simple basada en el número de equipos, solo un punto de partida editable.
+function sugerirNumGrupos(numEquipos) {
+  if (numEquipos <= 4) return 1;
+  if (numEquipos <= 8) return 2;
+  if (numEquipos <= 16) return 4;
+  return 8;
+}
+
+function sugerirClasificados() {
+  return 2;
+}
+
+function sugerirNumPartidos(numEquipos, numGrupos) {
+  const tam = Math.max(1, Math.round(numEquipos / Math.max(1, numGrupos)));
+  return Math.round(tam * (tam - 1) / 2);
+}
+
+function validarTorneoModal(data) {
+  const producto = data.numGrupos * data.clasificadosPorGrupo;
+  if (!esPotenciaDeDos(producto)) {
+    return { valid: false, error: `⚠️ grupos × clasificados debe ser una potencia de 2 (2, 4, 8, 16...). Actualmente: ${data.numGrupos} × ${data.clasificadosPorGrupo} = ${producto}.` };
+  }
+  if (data.numGrupos > 0 && data.clasificadosPorGrupo > Math.floor(data.numEquipos / data.numGrupos)) {
+    return { valid: false, error: `⚠️ No puede haber ${data.clasificadosPorGrupo} clasificados por grupo si algún grupo tiene menos equipos que eso.` };
+  }
+  return { valid: true, error: null };
+}
+
+// El calendario de grupos siempre es todos-contra-todos; numPartidosGrupo es solo orientativo,
+// no hay una forma justa de decidir qué partidos recortar si no coincide.
+function generarPartidosGrupo(grupos) {
+  const partidos = [];
+  (grupos || []).forEach(grupo => {
+    const equipos = grupo.equipos;
+    for (let i = 0; i < equipos.length; i++) {
+      for (let j = i + 1; j < equipos.length; j++) {
+        partidos.push({
+          id: uid(),
+          grupoId: grupo.id,
+          equipoA: equipos[i],
+          equipoB: equipos[j],
+          puntosA: null,
+          puntosB: null
+        });
+      }
+    }
+  });
+  return partidos;
+}
+
+function calcularClasificacionGrupo(torneo, grupoId) {
+  const grupo = (torneo.grupos || []).find(g => g.id === grupoId);
+  if (!grupo) return [];
+  const stats = {};
+  grupo.equipos.forEach(eq => {
+    stats[eq.id] = { equipo: eq, puntos: 0, jugados: 0, ganados: 0, favor: 0, contra: 0, diferencia: 0 };
+  });
+  (torneo.partidosGrupo || []).forEach(p => {
+    if (p.grupoId !== grupoId) return;
+    if (p.puntosA == null || p.puntosB == null) return;
+    const a = stats[p.equipoA.id];
+    const b = stats[p.equipoB.id];
+    if (!a || !b) return;
+    a.jugados += 1; b.jugados += 1;
+    a.favor += p.puntosA; a.contra += p.puntosB;
+    b.favor += p.puntosB; b.contra += p.puntosA;
+    if (p.puntosA > p.puntosB) { a.puntos += 2; a.ganados += 1; }
+    else if (p.puntosB > p.puntosA) { b.puntos += 2; b.ganados += 1; }
+  });
+  const lista = Object.values(stats).map(s => ({ ...s, diferencia: s.favor - s.contra }));
+  lista.sort((x, y) => {
+    if (y.puntos !== x.puntos) return y.puntos - x.puntos;
+    if (y.diferencia !== x.diferencia) return y.diferencia - x.diferencia;
+    return x.equipo.nombre.localeCompare(y.equipo.nombre);
+  });
+  return lista;
+}
+
+function puedeGenerarEliminatorias(torneo) {
+  if (!torneo.grupos || torneo.grupos.length === 0) return false;
+  // Si algún grupo tiene un solo equipo no genera partidos: se puede pasar directo a eliminatorias.
+  return (torneo.partidosGrupo || []).every(p => p.puntosA != null && p.puntosB != null);
+}
+
+// Orden clásico de seeding de un cuadro: seed 1 y 2 solo pueden verse en la final,
+// seeds 1-4 solo desde semifinales, etc. Ej: bracketOrder(8) = [1,8,4,5,2,7,3,6]
+function bracketOrder(tamano) {
+  let orden = [1];
+  while (orden.length < tamano) {
+    const nuevoTamano = orden.length * 2;
+    const siguiente = [];
+    orden.forEach(seed => {
+      siguiente.push(seed);
+      siguiente.push(nuevoTamano + 1 - seed);
+    });
+    orden = siguiente;
+  }
+  return orden;
+}
+
+function sizeToRoundName(numPartidosEnRonda) {
+  if (numPartidosEnRonda === 1) return 'Final';
+  if (numPartidosEnRonda === 2) return 'Semifinal';
+  if (numPartidosEnRonda === 4) return 'Cuartos de final';
+  if (numPartidosEnRonda === 8) return 'Octavos de final';
+  return `Ronda de ${numPartidosEnRonda * 2}`;
+}
+
+function crearEmparejamientosPrimeraRonda(torneo) {
+  const q = torneo.clasificadosPorGrupo;
+  const grupos = torneo.grupos;
+  // 1. Seeds por niveles: 1os de cada grupo, luego 2os de cada grupo, etc.
+  const seeds = [];
+  for (let rankLevel = 0; rankLevel < q; rankLevel++) {
+    grupos.forEach(grupo => {
+      const clasificacion = calcularClasificacionGrupo(torneo, grupo.id);
+      const clasificado = clasificacion[rankLevel];
+      seeds.push({ ...clasificado.equipo, grupoId: grupo.id });
+    });
+  }
+
+  const tamano = seeds.length;
+  const orden = bracketOrder(tamano);
+  const slots = orden.map(seedNum => seeds[seedNum - 1]);
+
+  const pares = [];
+  for (let i = 0; i < tamano; i += 2) {
+    pares.push([slots[i], slots[i + 1]]);
+  }
+
+  // 2. Corregir choques de equipos del mismo grupo en primera ronda.
+  for (let i = 0; i < pares.length; i++) {
+    const [a, b] = pares[i];
+    if (a.grupoId !== b.grupoId) continue;
+    for (let j = 0; j < pares.length; j++) {
+      if (j === i) continue;
+      const [c, d] = pares[j];
+      if (c.grupoId !== a.grupoId && c.grupoId !== b.grupoId && d.grupoId !== a.grupoId) {
+        pares[i][1] = d;
+        pares[j][1] = b;
+        break;
+      }
+    }
+  }
+
+  return pares;
+}
+
+function evaluarSetsGanados(partido, lado) {
+  let count = 0;
+  (partido.sets || []).forEach(s => {
+    if (s.puntosA == null || s.puntosB == null) return;
+    if (lado === 'A' && s.puntosA > s.puntosB) count++;
+    if (lado === 'B' && s.puntosB > s.puntosA) count++;
+  });
+  return count;
+}
+
+function evaluarGanadorPartido(partido) {
+  let setsA = 0, setsB = 0;
+  (partido.sets || []).forEach(s => {
+    if (s.puntosA == null || s.puntosB == null) return;
+    if (s.puntosA > s.puntosB) setsA += 1;
+    else if (s.puntosB > s.puntosA) setsB += 1;
+  });
+  if (setsA >= 2) return partido.equipoA.id;
+  if (setsB >= 2) return partido.equipoB.id;
+  return null;
+}
+
+function avanzarGanador(eliminatoria, rondaIdx, partidoIdx) {
+  if (rondaIdx + 1 >= eliminatoria.rondas.length) return;
+  const partido = eliminatoria.rondas[rondaIdx].partidos[partidoIdx];
+  if (!partido.ganadorId) return;
+  const ganador = (partido.equipoA && partido.equipoA.id === partido.ganadorId) ? partido.equipoA : partido.equipoB;
+  const siguienteIdx = Math.floor(partidoIdx / 2);
+  const siguiente = eliminatoria.rondas[rondaIdx + 1].partidos[siguienteIdx];
+  if (partidoIdx % 2 === 0) siguiente.equipoA = ganador;
+  else siguiente.equipoB = ganador;
 }
 
 /* ---------- Acciones sobre una lista concreta ---------- */
@@ -1219,6 +1630,252 @@ function getAllMembers(lista) {
   redes.forEach(r => (r.jugadores || []).forEach(j => set.add(j.nombre)));
   (lista && lista.espera || []).forEach(j => set.add(j.nombre));
   return [...set].sort();
+}
+
+/* ---------- Acciones sobre un torneo ---------- */
+
+function getTorneo(id) {
+  return state.torneos[id];
+}
+
+function updateTorneo(id, updater, opts) {
+  return update(prev => {
+    const actual = prev.torneos[id];
+    if (!actual) return prev;
+    const nuevo = typeof updater === 'function' ? updater(actual) : updater;
+    return { ...prev, torneos: { ...prev.torneos, [id]: nuevo } };
+  }, opts);
+}
+
+function openNewTorneoModal() {
+  const numEquipos = 8;
+  const numGrupos = sugerirNumGrupos(numEquipos);
+  newTorneoData = {
+    nombre: '',
+    categoria: 'mixto',
+    fechaInicio: '',
+    fechaFin: '',
+    puntosPorSet: PUNTOS_POR_SET_DEFAULT,
+    numEquipos,
+    equiposNombres: Array(numEquipos).fill(''),
+    numGrupos,
+    numPartidosGrupo: sugerirNumPartidos(numEquipos, numGrupos),
+    clasificadosPorGrupo: sugerirClasificados()
+  };
+  showNewTorneoModal = true;
+  render();
+}
+
+function closeNewTorneoModal() {
+  showNewTorneoModal = false;
+  render();
+}
+
+// Campos "no controlados": se guardan en el borrador sin forzar un render,
+// igual que setLugar(), para no perder el foco mientras se escribe.
+function setTorneoField(field, value) {
+  newTorneoData[field] = value;
+}
+
+function setTorneoEquipoNombre(i, value) {
+  newTorneoData.equiposNombres[i] = value;
+}
+
+// numGrupos/clasificadosPorGrupo sí necesitan render (afectan a la validación en vivo).
+function setTorneoNumGrupos(value) {
+  newTorneoData.numGrupos = Math.max(1, parseInt(value, 10) || 1);
+  render();
+}
+
+function setTorneoClasificados(value) {
+  newTorneoData.clasificadosPorGrupo = Math.max(1, parseInt(value, 10) || 1);
+  render();
+}
+
+function setTorneoNumPartidos(value) {
+  newTorneoData.numPartidosGrupo = Math.max(0, parseInt(value, 10) || 0);
+}
+
+function setTorneoPuntosPorSet(value) {
+  newTorneoData.puntosPorSet = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
+}
+
+function onNumEquiposChangeTorneo(value) {
+  const equiposAntes = newTorneoData.equiposNombres || [];
+  const nombresCapturados = equiposAntes.map((n, i) => {
+    const el = document.getElementById(`torneo-equipo-${i}`);
+    return el ? el.value : n;
+  });
+  const numEquipos = Math.max(2, parseInt(value, 10) || 0);
+  const equiposNombres = Array.from({ length: numEquipos }, (_, i) => nombresCapturados[i] || '');
+  const numGrupos = sugerirNumGrupos(numEquipos);
+  newTorneoData = {
+    ...newTorneoData,
+    numEquipos,
+    equiposNombres,
+    numGrupos,
+    clasificadosPorGrupo: sugerirClasificados(),
+    numPartidosGrupo: sugerirNumPartidos(numEquipos, numGrupos)
+  };
+  render();
+}
+
+async function confirmNewTorneo() {
+  const d = newTorneoData;
+  const nombre = (d.nombre || '').trim();
+  if (!nombre) { alert('Debes indicar un nombre para el torneo'); return; }
+  if (!d.fechaInicio || !d.fechaFin) { alert('Debes indicar fecha y hora de inicio y de fin'); return; }
+  if (d.fechaFin <= d.fechaInicio) { alert('La fecha de fin debe ser posterior a la de inicio'); return; }
+
+  const nombresEquipos = (d.equiposNombres || []).map(n => (n || '').trim());
+  if (nombresEquipos.length < 2 || nombresEquipos.some(n => !n)) {
+    alert('Debes indicar el nombre de todos los equipos');
+    return;
+  }
+
+  const validacion = validarTorneoModal(d);
+  if (!validacion.valid) {
+    alert(validacion.error.replace('⚠️ ', ''));
+    return;
+  }
+
+  const equipos = nombresEquipos.map(n => newEquipo(n));
+  const torneo = emptyTorneo({
+    nombre,
+    categoria: d.categoria,
+    fechaInicio: d.fechaInicio,
+    fechaFin: d.fechaFin,
+    puntosPorSet: d.puntosPorSet,
+    equipos,
+    numGrupos: d.numGrupos,
+    numPartidosGrupo: d.numPartidosGrupo,
+    clasificadosPorGrupo: d.clasificadosPorGrupo
+  });
+
+  await update(prev => ({ ...prev, torneos: { ...prev.torneos, [torneo.id]: torneo } }));
+  showNewTorneoModal = false;
+  openTorneo(torneo.id);
+}
+
+function sortearGrupos(torneoId) {
+  const torneo = getTorneo(torneoId);
+  if (!torneo) return;
+  if (torneo.sorteoConfirmado) {
+    if (!confirm('Ya hay resultados registrados en la fase de grupos. ¿Seguro que quieres volver a sortear? Se perderán los resultados de grupos y el cuadro de eliminatorias.')) return;
+  }
+
+  const equipos = [...torneo.equipos];
+  for (let i = equipos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [equipos[i], equipos[j]] = [equipos[j], equipos[i]];
+  }
+
+  const numGrupos = torneo.numGrupos;
+  const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const grupos = Array.from({ length: numGrupos }, (_, i) => ({ id: uid(), nombre: `Grupo ${letras[i] || (i + 1)}`, equipos: [] }));
+  equipos.forEach((eq, i) => {
+    grupos[i % numGrupos].equipos.push(eq);
+  });
+  const partidosGrupo = generarPartidosGrupo(grupos);
+
+  updateTorneo(torneoId, prev => ({
+    ...prev,
+    grupos,
+    partidosGrupo,
+    sorteoConfirmado: false,
+    eliminatoria: null,
+    historial: agregarHistorial(prev.historial, `🎲 Sorteo de grupos realizado (${numGrupos} grupos)`)
+  }));
+}
+
+function setResultadoPartidoGrupo(torneoId, partidoId, puntosA, puntosB) {
+  const a = (puntosA === '' || puntosA == null) ? null : Math.max(0, parseInt(puntosA, 10) || 0);
+  const b = (puntosB === '' || puntosB == null) ? null : Math.max(0, parseInt(puntosB, 10) || 0);
+  updateTorneo(torneoId, prev => ({
+    ...prev,
+    partidosGrupo: prev.partidosGrupo.map(p => p.id === partidoId ? { ...p, puntosA: a, puntosB: b } : p),
+    sorteoConfirmado: (a != null && b != null) ? true : prev.sorteoConfirmado
+  }));
+}
+
+function generarEliminatorias(torneoId) {
+  const torneo = getTorneo(torneoId);
+  if (!torneo || !puedeGenerarEliminatorias(torneo)) return;
+  if (torneo.eliminatoria) {
+    const hayProgreso = torneo.eliminatoria.rondas.some(r => r.partidos.some(p => p.ganadorId));
+    if (hayProgreso && !confirm('Ya hay resultados en el cuadro de eliminatorias. ¿Seguro que quieres regenerarlo? Se perderán.')) return;
+  }
+
+  const pares = crearEmparejamientosPrimeraRonda(torneo);
+
+  const rondas = [];
+  let n = pares.length;
+  while (true) {
+    const partidos = [];
+    for (let i = 0; i < n; i++) {
+      partidos.push({
+        id: uid(),
+        slotIndex: i,
+        equipoA: null,
+        equipoB: null,
+        sets: [{ puntosA: null, puntosB: null }, { puntosA: null, puntosB: null }, { puntosA: null, puntosB: null }],
+        ganadorId: null
+      });
+    }
+    rondas.push({ nombre: sizeToRoundName(n), partidos });
+    if (n === 1) break;
+    n = n / 2;
+  }
+  rondas[0].partidos.forEach((partido, i) => {
+    partido.equipoA = pares[i][0];
+    partido.equipoB = pares[i][1];
+  });
+
+  updateTorneo(torneoId, prev => ({
+    ...prev,
+    eliminatoria: { rondas },
+    historial: agregarHistorial(prev.historial, `🏆 Cuadro de eliminatorias generado (${pares.length * 2} equipos)`)
+  }));
+}
+
+function setResultadoSetEliminatoria(torneoId, partidoId, setIndex, puntosA, puntosB) {
+  const a = (puntosA === '' || puntosA == null) ? null : Math.max(0, parseInt(puntosA, 10) || 0);
+  const b = (puntosB === '' || puntosB == null) ? null : Math.max(0, parseInt(puntosB, 10) || 0);
+
+  updateTorneo(torneoId, prev => {
+    const eliminatoria = JSON.parse(JSON.stringify(prev.eliminatoria));
+    let rondaIdx = -1, partidoIdx = -1;
+    eliminatoria.rondas.forEach((ronda, ri) => {
+      ronda.partidos.forEach((p, pi) => {
+        if (p.id === partidoId) { rondaIdx = ri; partidoIdx = pi; }
+      });
+    });
+    if (rondaIdx === -1) return prev;
+    const partido = eliminatoria.rondas[rondaIdx].partidos[partidoIdx];
+    partido.sets[setIndex] = { puntosA: a, puntosB: b };
+    partido.ganadorId = (partido.equipoA && partido.equipoB) ? evaluarGanadorPartido(partido) : null;
+    if (partido.ganadorId) {
+      avanzarGanador(eliminatoria, rondaIdx, partidoIdx);
+    }
+    return { ...prev, eliminatoria };
+  });
+}
+
+function deleteTorneo(torneoId) {
+  const torneo = getTorneo(torneoId);
+  if (!torneo) return;
+  if (!confirm(`¿Borrar el torneo "${torneo.nombre}"? Se perderá toda la información: equipos, grupos y eliminatorias.`)) return;
+  update(prev => {
+    const torneos = { ...prev.torneos };
+    delete torneos[torneoId];
+    return { ...prev, torneos };
+  });
+  goToCalendar();
+}
+
+function puedeGestionarTorneo(torneo) {
+  if (isAdmin) return true;
+  return torneo.creatorOwner === DEVICE_ID;
 }
 
 /* ---------- Permisos: quién puede quitar a quién ---------- */
@@ -1468,6 +2125,7 @@ function renderCalendar() {
         <div class="cal-days">${daysHtml}</div>
       </div>
       <button class="add-list-btn" onclick="openNewListModal()">+ Nueva lista</button>
+      <button class="add-list-btn" style="margin-top: 10px;" onclick="openNewTorneoModal()">+ Nuevo torneo</button>
       ${isAdmin
         ? `<button class="admin-toggle active" onclick="logoutAdmin()">🔓 Admin activo · salir</button>`
         : `<button class="admin-toggle" onclick="loginAdmin()">🔑 Modo admin</button>`}
@@ -1587,6 +2245,289 @@ function renderListView() {
   `;
 }
 
+/* ---------- Render: torneos ---------- */
+
+function renderTorneosSection() {
+  const torneos = Object.values(state.torneos || {}).sort((a, b) => (a.fechaInicio || '').localeCompare(b.fechaInicio || ''));
+  if (torneos.length === 0) return '';
+
+  const cards = torneos.map(t => {
+    const badge = estadoTorneo(t);
+    const badgeClass = badge === 'En curso' ? 'live' : (badge === 'Finalizado' ? 'done' : 'upcoming');
+    return `
+      <div class="torneo-card" onclick="openTorneo('${t.id}')">
+        <div class="torneo-card-head">
+          <span class="torneo-card-nombre">${esc(t.nombre)}</span>
+          <span class="torneo-badge ${badgeClass}">${badge}</span>
+        </div>
+        <div class="torneo-card-meta">🏐 ${esc(t.categoria)} · 👥 ${t.equipos.length} equipos · ${faseTorneo(t)}</div>
+        <div class="torneo-card-fechas">${formatRangoFechasTorneo(t)}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="main torneos-section">
+      <div class="cal-month-label" style="margin-bottom: 12px;">Torneos</div>
+      ${cards}
+    </div>
+  `;
+}
+
+function renderNewTorneoModal() {
+  if (!showNewTorneoModal) return '';
+  const d = newTorneoData;
+  const validacion = validarTorneoModal(d);
+
+  const equiposInputs = d.equiposNombres.map((nombre, i) => `
+    <input type="text" id="torneo-equipo-${i}" class="equipo-input-row" placeholder="Equipo ${i + 1}" maxlength="30" value="${esc(nombre)}" oninput="setTorneoEquipoNombre(${i}, this.value)" />
+  `).join('');
+
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeNewTorneoModal()">
+      <div class="modal-box" style="max-width: 420px; max-height: 88vh; overflow-y: auto;">
+        <h3 class="modal-title">Nuevo torneo</h3>
+
+        <div class="labeled-field">
+          <label>Nombre del torneo</label>
+          <input type="text" id="torneo-nombre" placeholder="Torneo de verano" maxlength="60" value="${esc(d.nombre)}" oninput="setTorneoField('nombre', this.value)" />
+        </div>
+
+        <div class="labeled-field">
+          <label>Categoría</label>
+          <select id="torneo-categoria" onchange="setTorneoField('categoria', this.value)">
+            ${CATEGORIAS_TORNEO.map(c => `<option value="${c}" ${c === d.categoria ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Inicio</label>
+            <input type="datetime-local" id="torneo-fecha-inicio" value="${esc(d.fechaInicio)}" oninput="setTorneoField('fechaInicio', this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Fin</label>
+            <input type="datetime-local" id="torneo-fecha-fin" value="${esc(d.fechaFin)}" oninput="setTorneoField('fechaFin', this.value)" />
+          </div>
+        </div>
+
+        <div class="labeled-field">
+          <label>Número de equipos</label>
+          <input type="number" min="2" id="torneo-num-equipos" value="${d.numEquipos}" onchange="onNumEquiposChangeTorneo(this.value)" />
+        </div>
+
+        <div class="labeled-field">
+          <label>Nombres de los equipos</label>
+          ${equiposInputs}
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Nº de grupos</label>
+            <input type="number" min="1" id="torneo-num-grupos" value="${d.numGrupos}" onchange="setTorneoNumGrupos(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Clasifican por grupo</label>
+            <input type="number" min="1" id="torneo-clasificados" value="${d.clasificadosPorGrupo}" onchange="setTorneoClasificados(this.value)" />
+          </div>
+        </div>
+
+        <div class="labeled-field">
+          <label>Partidos en fase de grupos (orientativo, siempre se juega todos contra todos)</label>
+          <input type="number" min="0" id="torneo-num-partidos" value="${d.numPartidosGrupo}" onchange="setTorneoNumPartidos(this.value)" />
+        </div>
+
+        <div class="labeled-field">
+          <label>Puntos por set</label>
+          <input type="number" min="1" id="torneo-puntos-set" value="${d.puntosPorSet}" onchange="setTorneoPuntosPorSet(this.value)" />
+        </div>
+
+        ${validacion.valid ? '' : `<div class="modal-error">${validacion.error}</div>`}
+
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeNewTorneoModal()">Cancelar</button>
+          <button class="modal-btn confirm" ${validacion.valid ? '' : 'disabled'} onclick="confirmNewTorneo()">Crear torneo</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTorneoView() {
+  const torneo = getTorneo(view.torneoId);
+  if (!torneo) {
+    return `
+      <div class="main">
+        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        <div class="empty-state">
+          <div class="big">Este torneo ya no existe</div>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="header">
+      <div class="header-inner">
+        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        <div class="eyebrow">Volea Beach Forever 🏝️ · Torneo</div>
+        <div class="list-date-label">${formatRangoFechasTorneo(torneo)}</div>
+        <div class="title-row">
+          <h1 class="title">${esc(torneo.nombre)}</h1>
+        </div>
+        <div class="subtitle-row">
+          <div class="field-pill"><span class="icon">🏐</span><span>${esc(torneo.categoria)}</span></div>
+          <div class="field-pill"><span class="icon">👥</span><span>${torneo.equipos.length} equipos</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      ${renderTorneoEquiposYGrupos(torneo)}
+      ${torneo.grupos ? renderEliminatoriasSection(torneo) : ''}
+      ${puedeGestionarTorneo(torneo) ? `<button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:16px;" onclick="deleteTorneo('${torneo.id}')">🗑 Borrar este torneo</button>` : ''}
+    </div>
+  `;
+}
+
+function renderTorneoEquiposYGrupos(torneo) {
+  const gestionar = puedeGestionarTorneo(torneo);
+  if (!torneo.grupos) {
+    const listaEquipos = torneo.equipos.map(e => `<div class="empty-slot" style="opacity:0.8; font-style:normal;">${esc(e.nombre)}</div>`).join('');
+    return `
+      <div class="empty-state" style="padding: 24px 20px 8px;">
+        <div class="big">Todavía no se han sorteado los grupos</div>
+        <div>${torneo.equipos.length} equipos listos para el sorteo en ${torneo.numGrupos} grupo${torneo.numGrupos !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="players-list" style="margin-bottom: 16px;">${listaEquipos}</div>
+      ${gestionar ? `<button class="add-red-btn" onclick="sortearGrupos('${torneo.id}')">🎲 Sortear grupos</button>` : ''}
+    `;
+  }
+
+  const gruposHtml = torneo.grupos.map(g => renderGrupoCard(torneo, g)).join('');
+  return `
+    ${gestionar ? `<button class="add-red-btn" onclick="sortearGrupos('${torneo.id}')">🎲 Volver a sortear grupos</button>` : ''}
+    ${gruposHtml}
+  `;
+}
+
+function renderGrupoCard(torneo, grupo) {
+  const clasificacion = calcularClasificacionGrupo(torneo, grupo.id);
+  const filas = clasificacion.map((s, i) => `
+    <tr class="${i < torneo.clasificadosPorGrupo ? 'clasificado' : ''}">
+      <td>${i + 1}</td>
+      <td>${esc(s.equipo.nombre)}</td>
+      <td>${s.jugados}</td>
+      <td>${s.puntos}</td>
+      <td>${s.diferencia > 0 ? '+' : ''}${s.diferencia}</td>
+    </tr>
+  `).join('');
+
+  const partidos = torneo.partidosGrupo.filter(p => p.grupoId === grupo.id);
+  const partidosHtml = partidos.map(p => renderPartidoGrupoRow(torneo, p)).join('');
+
+  return `
+    <div class="red-card grupo-card">
+      <div class="red-head">
+        <div class="red-name-row"><span class="red-number">${esc(grupo.nombre)}</span></div>
+      </div>
+      <div class="players-list">
+        <table class="grupo-standings-table">
+          <thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>Pts</th><th>Dif</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div class="players-list">${partidosHtml}</div>
+    </div>
+  `;
+}
+
+function renderPartidoGrupoRow(torneo, partido) {
+  const idA = `pg-a-${partido.id}`;
+  const idB = `pg-b-${partido.id}`;
+  return `
+    <div class="player-row">
+      <span class="player-name">${esc(partido.equipoA.nombre)}</span>
+      <input type="number" min="0" id="${idA}" class="player-time-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
+      <span>–</span>
+      <input type="number" min="0" id="${idB}" class="player-time-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', document.getElementById('${idA}').value, this.value)" />
+      <span class="player-name" style="text-align:right;">${esc(partido.equipoB.nombre)}</span>
+    </div>
+  `;
+}
+
+function renderEliminatoriasSection(torneo) {
+  if (!torneo.eliminatoria) {
+    const puede = puedeGenerarEliminatorias(torneo);
+    return `
+      <div style="margin-top: 24px;">
+        <button class="add-red-btn" ${puede ? '' : 'disabled'} style="${puede ? '' : 'opacity:0.4; cursor:not-allowed;'}" onclick="generarEliminatorias('${torneo.id}')">🏆 Generar eliminatorias</button>
+        ${puede ? '' : '<div style="text-align:center; font-size:12px; opacity:0.6; margin-top:6px;">Completa todos los resultados de la fase de grupos para generar el cuadro.</div>'}
+      </div>
+    `;
+  }
+  return `
+    <div style="margin-top: 24px;">
+      <div class="cal-month-label" style="margin-bottom: 12px;">Eliminatorias</div>
+      ${renderBracket(torneo)}
+    </div>
+  `;
+}
+
+function renderBracket(torneo) {
+  const rondas = torneo.eliminatoria.rondas;
+  const columnas = rondas.map((ronda, ri) => {
+    const partidos = ronda.partidos.map(p => renderPartidoEliminatoria(torneo, p)).join('');
+    return `
+      <div class="bracket-round">
+        <div class="bracket-round-title">${esc(ronda.nombre)}</div>
+        ${partidos}
+      </div>
+    `;
+  }).join('');
+  return `<div class="bracket-container">${columnas}</div>`;
+}
+
+function renderPartidoEliminatoria(torneo, partido) {
+  const nombreA = partido.equipoA ? esc(partido.equipoA.nombre) : 'Por determinar';
+  const nombreB = partido.equipoB ? esc(partido.equipoB.nombre) : 'Por determinar';
+  const puedeJugarse = !!(partido.equipoA && partido.equipoB);
+
+  let setsHtml = '';
+  if (puedeJugarse) {
+    let ganadosA = 0, ganadosB = 0;
+    for (let s = 0; s < 3; s++) {
+      if (ganadosA >= 2 || ganadosB >= 2) break;
+      const set = partido.sets[s] || { puntosA: null, puntosB: null };
+      const idA = `pe-${partido.id}-${s}-a`;
+      const idB = `pe-${partido.id}-${s}-b`;
+      setsHtml += `
+        <div class="bracket-set-row">
+          <span>Set ${s + 1}</span>
+          <input type="number" min="0" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, this.value, document.getElementById('${idB}').value)" />
+          <input type="number" min="0" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, document.getElementById('${idA}').value, this.value)" />
+        </div>
+      `;
+      if (set.puntosA != null && set.puntosB != null) {
+        if (set.puntosA > set.puntosB) ganadosA++; else if (set.puntosB > set.puntosA) ganadosB++;
+      } else {
+        break; // no mostrar el siguiente set hasta rellenar este
+      }
+    }
+  }
+
+  const esGanadorA = partido.ganadorId && partido.equipoA && partido.ganadorId === partido.equipoA.id;
+  const esGanadorB = partido.ganadorId && partido.equipoB && partido.ganadorId === partido.equipoB.id;
+
+  return `
+    <div class="bracket-match">
+      <div class="bracket-team ${esGanadorA ? 'winner' : ''}">${nombreA}</div>
+      <div class="bracket-team ${esGanadorB ? 'winner' : ''}">${nombreB}</div>
+      ${setsHtml}
+    </div>
+  `;
+}
+
 /* ---------- Render principal ---------- */
 
 function render() {
@@ -1608,12 +2549,15 @@ function render() {
         </div>
       </div>
       ${renderCalendar()}
+      ${renderTorneosSection()}
     `;
   } else if (view.screen === 'list') {
     body = renderListView();
+  } else if (view.screen === 'torneo') {
+    body = renderTorneoView();
   }
 
-  app.innerHTML = body + renderNewListModal() + renderNewRedModal() + renderNotifyModal();
+  app.innerHTML = body + renderNewListModal() + renderNewRedModal() + renderNewTorneoModal() + renderNotifyModal();
 }
 
 function renderNotifyModal() {
@@ -1656,15 +2600,98 @@ function sanitizeLista(l) {
   return { lugar, espera, redes, historial };
 }
 
+function sanitizeEquipo(e) {
+  return { id: (e && e.id) || uid(), nombre: (e && typeof e.nombre === 'string') ? e.nombre : '' };
+}
+
+function sanitizeGrupo(g) {
+  return {
+    id: (g && g.id) || uid(),
+    nombre: (g && typeof g.nombre === 'string') ? g.nombre : '',
+    equipos: (g && Array.isArray(g.equipos)) ? g.equipos.map(sanitizeEquipo) : []
+  };
+}
+
+function sanitizePuntos(v) {
+  return (typeof v === 'number' && !isNaN(v)) ? v : null;
+}
+
+function sanitizePartidoGrupo(p) {
+  return {
+    id: (p && p.id) || uid(),
+    grupoId: (p && p.grupoId) || null,
+    equipoA: sanitizeEquipo(p && p.equipoA),
+    equipoB: sanitizeEquipo(p && p.equipoB),
+    puntosA: sanitizePuntos(p && p.puntosA),
+    puntosB: sanitizePuntos(p && p.puntosB)
+  };
+}
+
+function sanitizeSet(s) {
+  return { puntosA: sanitizePuntos(s && s.puntosA), puntosB: sanitizePuntos(s && s.puntosB) };
+}
+
+function sanitizePartidoEliminatoria(p, i) {
+  const setsRaw = (p && Array.isArray(p.sets)) ? p.sets : [];
+  const sets = [0, 1, 2].map(idx => sanitizeSet(setsRaw[idx]));
+  return {
+    id: (p && p.id) || uid(),
+    slotIndex: (p && typeof p.slotIndex === 'number') ? p.slotIndex : i,
+    equipoA: (p && p.equipoA) ? sanitizeEquipo(p.equipoA) : null,
+    equipoB: (p && p.equipoB) ? sanitizeEquipo(p.equipoB) : null,
+    sets,
+    ganadorId: (p && p.ganadorId) || null
+  };
+}
+
+function sanitizeEliminatoria(e) {
+  if (!e || !Array.isArray(e.rondas)) return null;
+  const rondas = e.rondas.map(r => ({
+    nombre: (r && typeof r.nombre === 'string') ? r.nombre : '',
+    partidos: (r && Array.isArray(r.partidos)) ? r.partidos.map(sanitizePartidoEliminatoria) : []
+  }));
+  return { rondas };
+}
+
+function sanitizeTorneo(t) {
+  const equipos = (t && Array.isArray(t.equipos)) ? t.equipos.map(sanitizeEquipo) : [];
+  return {
+    id: (t && t.id) || uid(),
+    nombre: (t && typeof t.nombre === 'string') ? t.nombre : '',
+    categoria: (t && CATEGORIAS_TORNEO.includes(t.categoria)) ? t.categoria : 'mixto',
+    fechaInicio: (t && typeof t.fechaInicio === 'string') ? t.fechaInicio : '',
+    fechaFin: (t && typeof t.fechaFin === 'string') ? t.fechaFin : '',
+    puntosPorSet: (t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT,
+    equipos,
+    numGrupos: (t && typeof t.numGrupos === 'number') ? t.numGrupos : 1,
+    numPartidosGrupo: (t && typeof t.numPartidosGrupo === 'number') ? t.numPartidosGrupo : 0,
+    clasificadosPorGrupo: (t && typeof t.clasificadosPorGrupo === 'number') ? t.clasificadosPorGrupo : 2,
+    grupos: (t && Array.isArray(t.grupos)) ? t.grupos.map(sanitizeGrupo) : null,
+    sorteoConfirmado: !!(t && t.sorteoConfirmado),
+    partidosGrupo: (t && Array.isArray(t.partidosGrupo)) ? t.partidosGrupo.map(sanitizePartidoGrupo) : [],
+    eliminatoria: sanitizeEliminatoria(t && t.eliminatoria),
+    creatorOwner: (t && t.creatorOwner) || null,
+    historial: (t && Array.isArray(t.historial)) ? t.historial : []
+  };
+}
+
 function sanitizeState(s) {
-  if (!s || typeof s !== 'object' || !s.listas || typeof s.listas !== 'object') {
+  if (!s || typeof s !== 'object') {
     return emptyState();
   }
   const listas = {};
-  Object.keys(s.listas).forEach(fecha => {
-    listas[fecha] = sanitizeLista(s.listas[fecha]);
-  });
-  return { listas };
+  if (s.listas && typeof s.listas === 'object') {
+    Object.keys(s.listas).forEach(fecha => {
+      listas[fecha] = sanitizeLista(s.listas[fecha]);
+    });
+  }
+  const torneos = {};
+  if (s.torneos && typeof s.torneos === 'object') {
+    Object.keys(s.torneos).forEach(id => {
+      torneos[id] = sanitizeTorneo(s.torneos[id]);
+    });
+  }
+  return { listas, torneos };
 }
 
 function getFechaFromUrl() {
