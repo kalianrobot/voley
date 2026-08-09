@@ -859,6 +859,56 @@
   background: var(--sand);
   outline: none;
 }
+
+.partido-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea);
+  opacity: 0.7;
+  padding-top: 8px;
+}
+
+.horario-fila {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(31,42,46,0.06);
+}
+.horario-fila:last-child { border-bottom: none; }
+
+.horario-hora {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--sea-deep);
+  flex-shrink: 0;
+  width: 90px;
+}
+
+.horario-celdas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.horario-celda {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.horario-campo {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--waiting);
+  background: rgba(176,134,66,0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
 </style>
 
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -900,6 +950,8 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
 const CATEGORIAS_TORNEO = ['masculino', 'femenino', 'mixto'];
 const PUNTOS_POR_SET_DEFAULT = 15;
+const NUM_CAMPOS_DEFAULT = 1;
+const DURACION_PARTIDO_DEFAULT = 20;
 
 let state = null;        // { listas: { 'YYYY-MM-DD': { lugar, redes } }, torneos: { id: Torneo } }
 let loading = true;
@@ -983,6 +1035,8 @@ function emptyTorneo(datos) {
     fechaInicio: datos.fechaInicio,
     fechaFin: datos.fechaFin,
     puntosPorSet: datos.puntosPorSet || PUNTOS_POR_SET_DEFAULT,
+    numCampos: datos.numCampos || NUM_CAMPOS_DEFAULT,
+    duracionPartidoMin: datos.duracionPartidoMin || DURACION_PARTIDO_DEFAULT,
     equipos: datos.equipos,
     numGrupos: datos.numGrupos,
     numPartidosGrupo: datos.numPartidosGrupo,
@@ -1243,26 +1297,96 @@ function validarTorneoModal(data) {
   return { valid: true, error: null };
 }
 
+// Método del "círculo": reparte los equipos de un grupo en rondas donde cada equipo
+// juega como mucho una vez por ronda (si el grupo es impar se añade un hueco/bye).
+// Esto es lo que luego permite repartir partidos de distintos grupos en la misma
+// franja horaria sin que ningún equipo tenga que jugar dos partidos a la vez.
+function generarRondasRoundRobin(equiposOriginales) {
+  const equipos = [...equiposOriginales];
+  if (equipos.length < 2) return [];
+  if (equipos.length % 2 !== 0) equipos.push(null); // bye
+  const n = equipos.length;
+  const numRondas = n - 1;
+  const rondas = [];
+  let arreglo = equipos.slice();
+  for (let r = 0; r < numRondas; r++) {
+    const ronda = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = arreglo[i];
+      const b = arreglo[n - 1 - i];
+      if (a && b) ronda.push([a, b]);
+    }
+    rondas.push(ronda);
+    const fijo = arreglo[0];
+    const resto = arreglo.slice(1);
+    resto.push(resto.shift());
+    arreglo = [fijo, ...resto];
+  }
+  return rondas;
+}
+
 // El calendario de grupos siempre es todos-contra-todos; numPartidosGrupo es solo orientativo,
 // no hay una forma justa de decidir qué partidos recortar si no coincide.
 function generarPartidosGrupo(grupos) {
   const partidos = [];
   (grupos || []).forEach(grupo => {
-    const equipos = grupo.equipos;
-    for (let i = 0; i < equipos.length; i++) {
-      for (let j = i + 1; j < equipos.length; j++) {
+    const rondas = generarRondasRoundRobin(grupo.equipos);
+    rondas.forEach((ronda, rIdx) => {
+      ronda.forEach(([equipoA, equipoB]) => {
         partidos.push({
           id: uid(),
           grupoId: grupo.id,
-          equipoA: equipos[i],
-          equipoB: equipos[j],
+          ronda: rIdx,
+          equipoA,
+          equipoB,
           puntosA: null,
-          puntosB: null
+          puntosB: null,
+          campo: null,
+          horaInicio: null
         });
-      }
-    }
+      });
+    });
   });
   return partidos;
+}
+
+function toDateTimeLocalString(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const mi = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d}T${h}:${mi}`;
+}
+
+// Asigna hora y campo a los partidos de fase de grupos. Todos los partidos de una
+// misma ronda (de cualquier grupo) son "seguros" en paralelo: ningún equipo se repite
+// dentro de una ronda (ver generarRondasRoundRobin), así que se reparten entre los
+// campos disponibles y solo se avanza de hora cuando se agotan los campos.
+function programarPartidosGrupo(torneo) {
+  const partidos = (torneo.partidosGrupo || []).map(p => ({ ...p }));
+  const numCampos = Math.max(1, torneo.numCampos || 1);
+  const duracionMin = Math.max(1, torneo.duracionPartidoMin || 20);
+  const duracionMs = duracionMin * 60000;
+
+  const maxRonda = partidos.reduce((m, p) => Math.max(m, p.ronda || 0), 0);
+  let tiempoActual = torneo.fechaInicio ? new Date(torneo.fechaInicio).getTime() : Date.now();
+
+  for (let r = 0; r <= maxRonda; r++) {
+    const partidosRonda = partidos
+      .filter(p => (p.ronda || 0) === r)
+      .sort((a, b) => a.grupoId.localeCompare(b.grupoId));
+    partidosRonda.forEach((partido, i) => {
+      if (i > 0 && i % numCampos === 0) tiempoActual += duracionMs;
+      partido.campo = (i % numCampos) + 1;
+      partido.horaInicio = toDateTimeLocalString(new Date(tiempoActual));
+    });
+    if (partidosRonda.length > 0) tiempoActual += duracionMs;
+  }
+
+  const horaFinEstimada = toDateTimeLocalString(new Date(tiempoActual));
+  const excedeFin = !!torneo.fechaFin && horaFinEstimada > torneo.fechaFin;
+  return { partidos, horaFinEstimada, excedeFin };
 }
 
 function calcularClasificacionGrupo(torneo, grupoId) {
@@ -1656,6 +1780,8 @@ function openNewTorneoModal() {
     fechaInicio: '',
     fechaFin: '',
     puntosPorSet: PUNTOS_POR_SET_DEFAULT,
+    numCampos: NUM_CAMPOS_DEFAULT,
+    duracionPartidoMin: DURACION_PARTIDO_DEFAULT,
     numEquipos,
     equiposNombres: Array(numEquipos).fill(''),
     numGrupos,
@@ -1698,6 +1824,14 @@ function setTorneoNumPartidos(value) {
 
 function setTorneoPuntosPorSet(value) {
   newTorneoData.puntosPorSet = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
+}
+
+function setTorneoNumCampos(value) {
+  newTorneoData.numCampos = Math.max(1, parseInt(value, 10) || NUM_CAMPOS_DEFAULT);
+}
+
+function setTorneoDuracionPartido(value) {
+  newTorneoData.duracionPartidoMin = Math.max(1, parseInt(value, 10) || DURACION_PARTIDO_DEFAULT);
 }
 
 function onNumEquiposChangeTorneo(value) {
@@ -1746,6 +1880,8 @@ async function confirmNewTorneo() {
     fechaInicio: d.fechaInicio,
     fechaFin: d.fechaFin,
     puntosPorSet: d.puntosPorSet,
+    numCampos: d.numCampos,
+    duracionPartidoMin: d.duracionPartidoMin,
     equipos,
     numGrupos: d.numGrupos,
     numPartidosGrupo: d.numPartidosGrupo,
@@ -1776,7 +1912,15 @@ function sortearGrupos(torneoId) {
   equipos.forEach((eq, i) => {
     grupos[i % numGrupos].equipos.push(eq);
   });
-  const partidosGrupo = generarPartidosGrupo(grupos);
+  const partidosSinProgramar = generarPartidosGrupo(grupos);
+  const { partidos: partidosGrupo, excedeFin } = programarPartidosGrupo({
+    ...torneo,
+    partidosGrupo: partidosSinProgramar
+  });
+
+  if (excedeFin) {
+    alert('⚠️ Con los campos y la duración configurados, la fase de grupos no cabe antes de la fecha/hora de fin del torneo. Se ha generado igualmente el horario completo.');
+  }
 
   updateTorneo(torneoId, prev => ({
     ...prev,
@@ -2342,6 +2486,17 @@ function renderNewTorneoModal() {
           <input type="number" min="1" id="torneo-puntos-set" value="${d.puntosPorSet}" onchange="setTorneoPuntosPorSet(this.value)" />
         </div>
 
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Nº de campos disponibles</label>
+            <input type="number" min="1" id="torneo-num-campos" value="${d.numCampos}" onchange="setTorneoNumCampos(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Duración por partido (min)</label>
+            <input type="number" min="1" id="torneo-duracion-partido" value="${d.duracionPartidoMin}" onchange="setTorneoDuracionPartido(this.value)" />
+          </div>
+        </div>
+
         ${validacion.valid ? '' : `<div class="modal-error">${validacion.error}</div>`}
 
         <div class="modal-actions">
@@ -2407,7 +2562,49 @@ function renderTorneoEquiposYGrupos(torneo) {
   const gruposHtml = torneo.grupos.map(g => renderGrupoCard(torneo, g)).join('');
   return `
     ${gestionar ? `<button class="add-red-btn" onclick="sortearGrupos('${torneo.id}')">🎲 Volver a sortear grupos</button>` : ''}
+    ${renderHorarioGeneral(torneo)}
     ${gruposHtml}
+  `;
+}
+
+function renderHorarioGeneral(torneo) {
+  const partidos = torneo.partidosGrupo || [];
+  if (partidos.length === 0) return '';
+  const porHora = {};
+  partidos.forEach(p => {
+    const key = p.horaInicio || '';
+    if (!porHora[key]) porHora[key] = [];
+    porHora[key].push(p);
+  });
+  const horas = Object.keys(porHora).sort();
+  const filas = horas.map(hora => {
+    const grupoPorId = {};
+    (torneo.grupos || []).forEach(g => { grupoPorId[g.id] = g.nombre; });
+    const celdas = porHora[hora]
+      .slice()
+      .sort((a, b) => (a.campo || 0) - (b.campo || 0))
+      .map(p => `
+        <div class="horario-celda">
+          <span class="horario-campo">Campo ${p.campo}</span>
+          <span>${esc(p.equipoA.nombre)} vs ${esc(p.equipoB.nombre)}</span>
+          <span style="opacity:0.5;">${esc(grupoPorId[p.grupoId] || '')}</span>
+        </div>
+      `).join('');
+    return `
+      <div class="horario-fila">
+        <div class="horario-hora">${hora ? formatFechaHoraCorta(hora) : '—'}</div>
+        <div class="horario-celdas">${celdas}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="red-card grupo-card">
+      <div class="red-head">
+        <div class="red-name-row"><span class="red-number">🗓️ Horario general</span></div>
+      </div>
+      <div class="players-list">${filas}</div>
+    </div>
   `;
 }
 
@@ -2423,7 +2620,9 @@ function renderGrupoCard(torneo, grupo) {
     </tr>
   `).join('');
 
-  const partidos = torneo.partidosGrupo.filter(p => p.grupoId === grupo.id);
+  const partidos = torneo.partidosGrupo
+    .filter(p => p.grupoId === grupo.id)
+    .sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || '') || (a.campo || 0) - (b.campo || 0));
   const partidosHtml = partidos.map(p => renderPartidoGrupoRow(torneo, p)).join('');
 
   return `
@@ -2445,7 +2644,11 @@ function renderGrupoCard(torneo, grupo) {
 function renderPartidoGrupoRow(torneo, partido) {
   const idA = `pg-a-${partido.id}`;
   const idB = `pg-b-${partido.id}`;
+  const meta = partido.horaInicio
+    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo}</div>`
+    : '';
   return `
+    ${meta}
     <div class="player-row">
       <span class="player-name">${esc(partido.equipoA.nombre)}</span>
       <input type="number" min="0" id="${idA}" class="player-time-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
@@ -2620,10 +2823,13 @@ function sanitizePartidoGrupo(p) {
   return {
     id: (p && p.id) || uid(),
     grupoId: (p && p.grupoId) || null,
+    ronda: (p && typeof p.ronda === 'number') ? p.ronda : 0,
     equipoA: sanitizeEquipo(p && p.equipoA),
     equipoB: sanitizeEquipo(p && p.equipoB),
     puntosA: sanitizePuntos(p && p.puntosA),
-    puntosB: sanitizePuntos(p && p.puntosB)
+    puntosB: sanitizePuntos(p && p.puntosB),
+    campo: (p && typeof p.campo === 'number') ? p.campo : null,
+    horaInicio: (p && typeof p.horaInicio === 'string') ? p.horaInicio : null
   };
 }
 
@@ -2662,6 +2868,8 @@ function sanitizeTorneo(t) {
     fechaInicio: (t && typeof t.fechaInicio === 'string') ? t.fechaInicio : '',
     fechaFin: (t && typeof t.fechaFin === 'string') ? t.fechaFin : '',
     puntosPorSet: (t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT,
+    numCampos: (t && typeof t.numCampos === 'number') ? t.numCampos : NUM_CAMPOS_DEFAULT,
+    duracionPartidoMin: (t && typeof t.duracionPartidoMin === 'number') ? t.duracionPartidoMin : DURACION_PARTIDO_DEFAULT,
     equipos,
     numGrupos: (t && typeof t.numGrupos === 'number') ? t.numGrupos : 1,
     numPartidosGrupo: (t && typeof t.numPartidosGrupo === 'number') ? t.numPartidosGrupo : 0,
