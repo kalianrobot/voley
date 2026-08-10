@@ -980,6 +980,16 @@
   opacity: 0.6;
   flex-shrink: 0;
 }
+.horario-arbitro.pendiente {
+  color: var(--waiting);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.arbitro-pendiente {
+  color: var(--waiting);
+  font-weight: 700;
+}
 
 .horario-aviso {
   font-size: 12px;
@@ -3426,7 +3436,7 @@ function renderHorarioGeneral(torneo) {
           ${hayVarios ? `<span class="horario-torneo-badge">${esc(capitalizar(t.categoria))}</span>` : ''}
           <span>${esc(p.equipoA.nombre)} vs ${esc(p.equipoB.nombre)}</span>
           <span style="opacity:0.5;">${esc(grupoPorId[p.grupoId] || '')}</span>
-          ${p.arbitro ? `<span class="horario-arbitro">Árbitro: ${esc(p.arbitro.nombre)}</span>` : ''}
+          <span class="horario-arbitro ${p.arbitro ? '' : 'pendiente'}">${p.arbitro ? `Árbitro: ${esc(p.arbitro.nombre)}` : 'Árbitro por asignar'}</span>
         </div>
       `).join('');
     return `
@@ -3493,8 +3503,11 @@ function renderGrupoCard(torneo, grupo) {
 function renderPartidoGrupoRow(torneo, partido) {
   const idA = `pg-a-${partido.id}`;
   const idB = `pg-b-${partido.id}`;
+  const arbitroTexto = partido.arbitro
+    ? `Árbitro: ${esc(partido.arbitro.nombre)}`
+    : `<span class="arbitro-pendiente">Árbitro por asignar</span>`;
   const meta = partido.horaInicio
-    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo}${partido.arbitro ? ` · Árbitro: ${esc(partido.arbitro.nombre)}` : ''}</div>`
+    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo} · ${arbitroTexto}</div>`
     : '';
   return `
     ${meta}
