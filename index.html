@@ -10,6 +10,7 @@
   --paper: #FBF7EE;
   --line: rgba(31,42,46,0.12);
   --waiting: #B08642;
+  --green: #2E7D32;
 }
 
 #app {
@@ -927,6 +928,30 @@
   padding-top: 8px;
 }
 
+.campo-disponible {
+  color: var(--green);
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* Partido que puede jugarse ya (el campo ha quedado libre y le toca a este). */
+.player-row.partido-actual {
+  background: rgba(46,125,50,0.10);
+  border-radius: 10px;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border-bottom-color: transparent;
+}
+
+/* Partido ya jugado: se atenúa y subraya, pero se puede seguir editando. */
+.player-row.partido-jugado {
+  opacity: 0.55;
+}
+.player-row.partido-jugado .player-name {
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
 .horario-fila {
   display: flex;
   gap: 12px;
@@ -972,6 +997,16 @@
 /* --- Torneos simultáneos --- */
 
 .horario-celda.otro-torneo { opacity: 0.45; }
+.horario-celda.campo-actual {
+  background: rgba(46,125,50,0.12);
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: -4px -8px;
+}
+.horario-celda.campo-jugado {
+  opacity: 0.5;
+  text-decoration: underline;
+}
 
 .horario-torneo-badge {
   font-size: 10.5px;
@@ -1841,6 +1876,36 @@ function calcularClasificacionGrupo(torneo, grupoId) {
     return x.equipo.nombre.localeCompare(y.equipo.nombre);
   });
   return lista;
+}
+
+// Para cada campo (compartido con los torneos simultáneos del mismo bloque), calcula
+// qué partido es "el actual": el más próximo sin resultado en orden de horario, que es
+// el que puede jugarse en cuanto el campo quede libre. Los partidos con resultado se
+// marcan como jugados (siguen siendo editables); el resto queda sin marcar.
+function calcularEstadoPartidosPorCampo(torneo) {
+  const bloque = torneosDelBloque(torneo);
+  const porCampo = {};
+  bloque.forEach(t => {
+    (t.partidosGrupo || []).forEach(p => {
+      if (p.campo == null) return;
+      if (!porCampo[p.campo]) porCampo[p.campo] = [];
+      porCampo[p.campo].push(p);
+    });
+  });
+  const estado = {};
+  Object.values(porCampo).forEach(lista => {
+    lista.sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || ''));
+    let asignadoActual = false;
+    lista.forEach(p => {
+      if (p.puntosA != null && p.puntosB != null) {
+        estado[p.id] = 'jugado';
+      } else if (!asignadoActual) {
+        estado[p.id] = 'actual';
+        asignadoActual = true;
+      }
+    });
+  });
+  return estado;
 }
 
 function puedeGenerarEliminatorias(torneo) {
@@ -3597,17 +3662,18 @@ function renderTorneoEquiposYGrupos(torneo) {
     `;
   }
 
-  const gruposHtml = torneo.grupos.map(g => renderGrupoCard(torneo, g)).join('');
+  const estadoCampos = calcularEstadoPartidosPorCampo(torneo);
+  const gruposHtml = torneo.grupos.map(g => renderGrupoCard(torneo, g, estadoCampos)).join('');
   return `
     ${gestionar ? `<button class="add-red-btn" onclick="sortearGrupos('${torneo.id}')">🎲 Volver a sortear grupos</button>` : ''}
-    ${renderHorarioGeneral(torneo)}
+    ${renderHorarioGeneral(torneo, estadoCampos)}
     ${gruposHtml}
   `;
 }
 
 // El horario muestra los partidos de todo el bloque (los torneos simultáneos comparten
 // pistas), etiquetando cada partido con su torneo y atenuando los del torneo hermano.
-function renderHorarioGeneral(torneo) {
+function renderHorarioGeneral(torneo, estadoCampos) {
   const bloque = torneosDelBloque(torneo);
   const hayVarios = bloque.length > 1;
 
@@ -3647,15 +3713,20 @@ function renderHorarioGeneral(torneo) {
     const celdas = porHora[hora]
       .slice()
       .sort((a, b) => (a.partido.campo || 0) - (b.partido.campo || 0))
-      .map(({ partido: p, torneo: t }) => `
-        <div class="horario-celda ${hayVarios && t.id !== torneo.id ? 'otro-torneo' : ''}">
+      .map(({ partido: p, torneo: t }) => {
+        const estado = estadoCampos ? estadoCampos[p.id] : null;
+        const claseEstado = estado === 'jugado' ? 'campo-jugado' : (estado === 'actual' ? 'campo-actual' : '');
+        return `
+        <div class="horario-celda ${hayVarios && t.id !== torneo.id ? 'otro-torneo' : ''} ${claseEstado}">
           <span class="horario-campo">Campo ${p.campo}</span>
           ${hayVarios ? `<span class="horario-torneo-badge">${esc(capitalizar(t.categoria))}</span>` : ''}
+          ${estado === 'actual' ? '<span class="campo-disponible">🟢 Disponible</span>' : ''}
           <span>${esc(p.equipoA.nombre)} vs ${esc(p.equipoB.nombre)}</span>
           <span style="opacity:0.5;">${esc(grupoPorId[p.grupoId] || '')}</span>
           <span class="horario-arbitro ${p.arbitro ? '' : 'pendiente'}">${p.arbitro ? `Árbitro: ${esc(p.arbitro.nombre)}` : 'Árbitro por asignar'}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
     return `
       ${filaComida}
       <div class="horario-fila">
@@ -3682,7 +3753,7 @@ function renderHorarioGeneral(torneo) {
   `;
 }
 
-function renderGrupoCard(torneo, grupo) {
+function renderGrupoCard(torneo, grupo, estadoCampos) {
   const clasificacion = calcularClasificacionGrupo(torneo, grupo.id);
   const filas = clasificacion.map((s, i) => `
     <tr class="${i < torneo.clasificadosPorGrupo ? 'clasificado' : ''}">
@@ -3697,7 +3768,7 @@ function renderGrupoCard(torneo, grupo) {
   const partidos = torneo.partidosGrupo
     .filter(p => p.grupoId === grupo.id)
     .sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || '') || (a.campo || 0) - (b.campo || 0));
-  const partidosHtml = partidos.map(p => renderPartidoGrupoRow(torneo, p)).join('');
+  const partidosHtml = partidos.map(p => renderPartidoGrupoRow(torneo, p, estadoCampos)).join('');
 
   return `
     <div class="red-card grupo-card">
@@ -3718,18 +3789,21 @@ function renderGrupoCard(torneo, grupo) {
   `;
 }
 
-function renderPartidoGrupoRow(torneo, partido) {
+function renderPartidoGrupoRow(torneo, partido, estadoCampos) {
   const idA = `pg-a-${partido.id}`;
   const idB = `pg-b-${partido.id}`;
   const arbitroTexto = partido.arbitro
     ? `Árbitro: ${esc(partido.arbitro.nombre)}`
     : `<span class="arbitro-pendiente">Árbitro por asignar</span>`;
+  const estado = estadoCampos ? estadoCampos[partido.id] : null;
+  const etiquetaEstado = estado === 'actual' ? ' <span class="campo-disponible">🟢 Campo libre</span>' : '';
   const meta = partido.horaInicio
-    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo} · ${arbitroTexto}</div>`
+    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo} · ${arbitroTexto}${etiquetaEstado}</div>`
     : '';
+  const filaClase = estado === 'jugado' ? ' partido-jugado' : (estado === 'actual' ? ' partido-actual' : '');
   return `
     ${meta}
-    <div class="player-row">
+    <div class="player-row${filaClase}">
       <span class="player-name">${esc(partido.equipoA.nombre)}</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idA}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
       <span>–</span>
