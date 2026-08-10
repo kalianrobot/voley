@@ -1049,6 +1049,28 @@
   padding: 8px 12px;
   margin-bottom: 14px;
 }
+
+.equipo-editable-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.add-equipo-btn {
+  width: 100%;
+  border: 2px dashed var(--sea);
+  background: transparent;
+  color: var(--sea);
+  font-family: 'Sora', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.add-equipo-btn:hover { background: rgba(27,94,99,0.06); }
 </style>
 
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -1106,6 +1128,8 @@ let notifyMessage = null;
 let showHistorial = false;
 let showNewTorneoModal = false;
 let newTorneoData = null; // se inicializa en openNewTorneoModal()
+let showEditarTorneoModal = false;
+let editTorneoData = null; // se inicializa en openEditarTorneoModal()
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -1671,6 +1695,43 @@ function asignarArbitros(equiposTorneo, partidos) {
   return resultado;
 }
 
+// Un cambio "estructural" en los equipos (añadir, quitar, o cualquier id nuevo) invalida
+// los grupos ya sorteados; un simple renombrado (mismos ids) no.
+function equiposCambianEstructura(actuales, nuevos) {
+  if (actuales.length !== nuevos.length) return true;
+  const idsActuales = new Set(actuales.map(e => e.id));
+  return nuevos.some(e => !e.id || !idsActuales.has(e.id));
+}
+
+// Aplica un renombrado de equipos (por id) a todas las copias que el torneo tiene
+// embebidas: equipos, grupos, partidos de grupo (incluido el árbitro) y eliminatoria.
+// No toca nada más, así que resultados y horarios ya calculados se mantienen intactos.
+function renombrarEquiposEnTorneo(torneo, renombres) {
+  if (!renombres || Object.keys(renombres).length === 0) return torneo;
+  const conNuevoNombre = (e) => (e && renombres[e.id]) ? { ...e, nombre: renombres[e.id] } : e;
+  return {
+    ...torneo,
+    equipos: torneo.equipos.map(conNuevoNombre),
+    grupos: (torneo.grupos || []).map(g => ({ ...g, equipos: g.equipos.map(conNuevoNombre) })),
+    partidosGrupo: (torneo.partidosGrupo || []).map(p => ({
+      ...p,
+      equipoA: conNuevoNombre(p.equipoA),
+      equipoB: conNuevoNombre(p.equipoB),
+      arbitro: p.arbitro ? conNuevoNombre(p.arbitro) : null
+    })),
+    eliminatoria: torneo.eliminatoria ? {
+      rondas: torneo.eliminatoria.rondas.map(r => ({
+        ...r,
+        partidos: r.partidos.map(p => ({
+          ...p,
+          equipoA: conNuevoNombre(p.equipoA),
+          equipoB: conNuevoNombre(p.equipoB)
+        }))
+      }))
+    } : null
+  };
+}
+
 function calcularClasificacionGrupo(torneo, grupoId) {
   const grupo = (torneo.grupos || []).find(g => g.id === grupoId);
   if (!grupo) return [];
@@ -2228,20 +2289,198 @@ async function confirmNewTorneo() {
   openTorneo(torneos[0].id);
 }
 
-function sortearGrupos(torneoId) {
+/* ---------- Edición de un torneo ya creado ---------- */
+
+function openEditarTorneoModal(torneoId) {
   const torneo = getTorneo(torneoId);
   if (!torneo) return;
-  if (torneo.sorteoConfirmado) {
-    if (!confirm('Ya hay resultados registrados en la fase de grupos. ¿Seguro que quieres volver a sortear? Se perderán los resultados de grupos y el cuadro de eliminatorias.')) return;
+  editTorneoData = {
+    torneoId,
+    nombre: torneo.nombre,
+    fechaInicio: torneo.fechaInicio,
+    fechaFin: torneo.fechaFin,
+    puntosPorSet: torneo.puntosPorSet,
+    numCampos: torneo.numCampos,
+    duracionPartidoMin: torneo.duracionPartidoMin,
+    equipos: torneo.equipos.map(e => ({ ...e })),
+    numGrupos: torneo.numGrupos,
+    clasificadosPorGrupo: torneo.clasificadosPorGrupo,
+    numPartidosGrupo: torneo.numPartidosGrupo
+  };
+  showEditarTorneoModal = true;
+  render();
+}
+
+function closeEditarTorneoModal() {
+  showEditarTorneoModal = false;
+  render();
+}
+
+// Campos "no controlados": igual que en el modal de creación, no fuerzan render para
+// no perder el foco mientras se escribe.
+function setEditTorneoField(field, value) {
+  editTorneoData[field] = value;
+}
+
+function setEditTorneoEquipoNombre(idx, value) {
+  editTorneoData.equipos[idx].nombre = value;
+}
+
+function reclamarGruposYClasificadosEdit() {
+  const opcionesG = opcionesNumGrupos(editTorneoData.equipos.length);
+  if (!opcionesG.includes(editTorneoData.numGrupos)) {
+    editTorneoData.numGrupos = opcionesG[opcionesG.length - 1];
+  }
+  const opcionesC = opcionesClasificados(editTorneoData.equipos.length, editTorneoData.numGrupos);
+  if (!opcionesC.includes(editTorneoData.clasificadosPorGrupo)) {
+    editTorneoData.clasificadosPorGrupo = opcionesC[opcionesC.length - 1];
+  }
+}
+
+function setEditTorneoNumGrupos(value) {
+  editTorneoData.numGrupos = Math.max(1, parseInt(value, 10) || 1);
+  const opciones = opcionesClasificados(editTorneoData.equipos.length, editTorneoData.numGrupos);
+  if (!opciones.includes(editTorneoData.clasificadosPorGrupo)) {
+    editTorneoData.clasificadosPorGrupo = opciones[opciones.length - 1];
+  }
+  render();
+}
+
+function setEditTorneoClasificados(value) {
+  editTorneoData.clasificadosPorGrupo = Math.max(1, parseInt(value, 10) || 1);
+  render();
+}
+
+function setEditTorneoNumPartidos(value) {
+  editTorneoData.numPartidosGrupo = Math.max(0, parseInt(value, 10) || 0);
+}
+
+function setEditTorneoPuntosPorSet(value) {
+  editTorneoData.puntosPorSet = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
+}
+
+function setEditTorneoNumCampos(value) {
+  editTorneoData.numCampos = Math.max(1, parseInt(value, 10) || NUM_CAMPOS_DEFAULT);
+}
+
+function setEditTorneoDuracionPartido(value) {
+  editTorneoData.duracionPartidoMin = Math.max(1, parseInt(value, 10) || DURACION_PARTIDO_DEFAULT);
+}
+
+function addEditTorneoEquipo() {
+  editTorneoData.equipos.push({ id: null, nombre: '' });
+  reclamarGruposYClasificadosEdit();
+  render();
+}
+
+function removeEditTorneoEquipo(idx) {
+  if (editTorneoData.equipos.length <= 2) return; // un torneo necesita al menos 2 equipos
+  editTorneoData.equipos.splice(idx, 1);
+  reclamarGruposYClasificadosEdit();
+  render();
+}
+
+async function confirmEditarTorneo() {
+  const d = editTorneoData;
+  const torneo = getTorneo(d.torneoId);
+  if (!torneo) { closeEditarTorneoModal(); return; }
+
+  const nombre = (d.nombre || '').trim();
+  if (!nombre) { alert('Debes indicar un nombre para el torneo'); return; }
+  if (!d.fechaInicio || !d.fechaFin) { alert('Debes indicar fecha y hora de inicio y de fin'); return; }
+  if (d.fechaFin <= d.fechaInicio) { alert('La fecha de fin debe ser posterior a la de inicio'); return; }
+
+  const equiposNombres = d.equipos.map(e => (e.nombre || '').trim());
+  if (equiposNombres.length < 2 || equiposNombres.some(n => !n)) {
+    alert('Debes indicar el nombre de todos los equipos');
+    return;
   }
 
-  const equipos = [...torneo.equipos];
+  const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length });
+  if (errorComp) { alert(errorComp); return; }
+
+  // Los equipos que ya existían conservan su id (para que clasificación/histórico sigan
+  // hablando del mismo equipo); los añadidos en este modal (id null) se crean ahora.
+  const equiposFinal = d.equipos.map((e, i) => e.id ? { id: e.id, nombre: equiposNombres[i] } : newEquipo(equiposNombres[i]));
+
+  const cambioEstructura = equiposCambianEstructura(torneo.equipos, equiposFinal)
+    || d.numGrupos !== torneo.numGrupos
+    || d.clasificadosPorGrupo !== torneo.clasificadosPorGrupo;
+
+  // Sin cambio estructural, un mismo id con nombre distinto es un renombrado: se aplica
+  // en cascada a grupos/partidos/árbitros/eliminatoria en vez de perder el sorteo.
+  const renombres = {};
+  if (!cambioEstructura) {
+    equiposFinal.forEach(e => {
+      const original = torneo.equipos.find(o => o.id === e.id);
+      if (original && original.nombre !== e.nombre) renombres[e.id] = e.nombre;
+    });
+  }
+
+  const camposCompartidosNuevos = {
+    nombre, fechaInicio: d.fechaInicio, fechaFin: d.fechaFin,
+    puntosPorSet: d.puntosPorSet, numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin
+  };
+  const cambianCompartidos = CAMPOS_COMPARTIDOS_BLOQUE.some(c => camposCompartidosNuevos[c] !== torneo[c]);
+  const bloqueConCompartidos = torneosDelBloque(torneo).map(t => ({ ...t, ...camposCompartidosNuevos }));
+
+  if (cambioEstructura) {
+    if (torneo.grupos) {
+      if (!confirm('Cambiar los equipos o los grupos requiere volver a sortear. Se perderán los resultados de la fase de grupos y el cuadro de eliminatorias actuales. ¿Continuar?')) return;
+    }
+    const torneoEditado = {
+      ...torneo,
+      ...camposCompartidosNuevos,
+      equipos: equiposFinal,
+      numGrupos: d.numGrupos,
+      clasificadosPorGrupo: d.clasificadosPorGrupo,
+      numPartidosGrupo: d.numPartidosGrupo
+    };
+    if (torneo.grupos) {
+      ejecutarSorteo(torneoEditado, bloqueConCompartidos.map(t => t.id === torneo.id ? torneoEditado : t));
+    } else {
+      // Aún no se han sorteado grupos: basta con guardar la configuración nueva.
+      guardarCambiosSinResortear(torneo.id, torneoEditado, bloqueConCompartidos);
+    }
+  } else {
+    let torneoPropio = { ...torneo, ...camposCompartidosNuevos, numPartidosGrupo: d.numPartidosGrupo };
+    if (Object.keys(renombres).length > 0) {
+      torneoPropio = renombrarEquiposEnTorneo(torneoPropio, renombres);
+    }
+    if (cambianCompartidos && torneosDelBloque(torneo).some(t => t.grupos)) {
+      reprogramarBloque(bloqueConCompartidos.map(t => t.id === torneo.id ? torneoPropio : t));
+    } else {
+      guardarCambiosSinResortear(torneo.id, torneoPropio, bloqueConCompartidos);
+    }
+  }
+
+  showEditarTorneoModal = false;
+  render();
+}
+
+// Campos que un torneo simultáneo comparte con sus hermanos de bloque (ver
+// torneosDelBloque): al editarlos hay que mantenerlos sincronizados, porque
+// programarPartidosBloque solo usa la configuración del primero del bloque.
+const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'numCampos', 'duracionPartidoMin'];
+
+function soloCamposCompartidos(t) {
+  const campos = {};
+  CAMPOS_COMPARTIDOS_BLOQUE.forEach(c => { campos[c] = t[c]; });
+  return campos;
+}
+
+// Baraja los equipos de torneoConDatos, arma grupos nuevos, genera y programa sus
+// partidos (junto con los del resto del bloque) y asigna árbitros. torneoConDatos puede
+// venir tal cual está en `state` (sortearGrupos) o con campos ya editados sin guardar
+// todavía (confirmEditarTorneo) — en ambos casos el resultado se escribe de una vez.
+function ejecutarSorteo(torneoConDatos, bloqueBase) {
+  const equipos = [...torneoConDatos.equipos];
   for (let i = equipos.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [equipos[i], equipos[j]] = [equipos[j], equipos[i]];
   }
 
-  const numGrupos = torneo.numGrupos;
+  const numGrupos = torneoConDatos.numGrupos;
   const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const grupos = Array.from({ length: numGrupos }, (_, i) => ({ id: uid(), nombre: `Grupo ${letras[i] || (i + 1)}`, equipos: [] }));
   equipos.forEach((eq, i) => {
@@ -2252,8 +2491,8 @@ function sortearGrupos(torneoId) {
   // Al cambiar las tandas de este torneo se desplazan las franjas de sus torneos
   // simultáneos, así que hay que reprogramar el bloque entero. A los hermanos solo
   // se les recolocan hora y campo: sus partidos y resultados se mantienen.
-  const torneoConNuevosPartidos = { ...torneo, partidosGrupo: partidosSinProgramar };
-  const bloque = torneosDelBloque(torneo).map(t => t.id === torneoId ? torneoConNuevosPartidos : t);
+  const torneoConNuevosPartidos = { ...torneoConDatos, partidosGrupo: partidosSinProgramar };
+  const bloque = bloqueBase.map(t => t.id === torneoConDatos.id ? torneoConNuevosPartidos : t);
   const { porTorneo, excedeFin } = programarPartidosBloque(bloque);
 
   if (excedeFin) {
@@ -2269,11 +2508,17 @@ function sortearGrupos(torneoId) {
 
   update(prev => {
     const torneos = { ...prev.torneos };
-    Object.keys(porTorneoConArbitros).forEach(id => {
+    bloque.forEach(t => {
+      const id = t.id;
       if (!torneos[id]) return;
-      if (id === torneoId) {
+      if (id === torneoConDatos.id) {
         torneos[id] = {
           ...torneos[id],
+          ...soloCamposCompartidos(torneoConDatos),
+          equipos: torneoConDatos.equipos,
+          numGrupos: torneoConDatos.numGrupos,
+          clasificadosPorGrupo: torneoConDatos.clasificadosPorGrupo,
+          numPartidosGrupo: torneoConDatos.numPartidosGrupo,
           grupos,
           partidosGrupo: porTorneoConArbitros[id],
           sorteoConfirmado: false,
@@ -2281,7 +2526,59 @@ function sortearGrupos(torneoId) {
           historial: agregarHistorial(torneos[id].historial, `🎲 Sorteo de grupos realizado (${numGrupos} grupos)`)
         };
       } else {
-        torneos[id] = { ...torneos[id], partidosGrupo: porTorneoConArbitros[id] };
+        torneos[id] = { ...torneos[id], ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[id] };
+      }
+    });
+    return { ...prev, torneos };
+  });
+}
+
+function sortearGrupos(torneoId) {
+  const torneo = getTorneo(torneoId);
+  if (!torneo) return;
+  if (torneo.sorteoConfirmado) {
+    if (!confirm('Ya hay resultados registrados en la fase de grupos. ¿Seguro que quieres volver a sortear? Se perderán los resultados de grupos y el cuadro de eliminatorias.')) return;
+  }
+  ejecutarSorteo(torneo, torneosDelBloque(torneo));
+}
+
+// Reprograma horas/campos/árbitros de todo el bloque sin tocar grupos ni resultados
+// (usado al editar campos compartidos como nº de campos/duración/fechas cuando ya hay
+// grupos sorteados). bloqueActualizado ya trae los campos compartidos con sus valores nuevos.
+function reprogramarBloque(bloqueActualizado) {
+  const { porTorneo, excedeFin } = programarPartidosBloque(bloqueActualizado);
+  if (excedeFin) {
+    alert('⚠️ Con los campos y la duración configurados, la fase de grupos no cabe antes de la fecha/hora de fin del torneo. Se ha generado igualmente el horario completo.');
+  }
+  const porTorneoConArbitros = {};
+  bloqueActualizado.forEach(t => {
+    porTorneoConArbitros[t.id] = asignarArbitros(t.equipos, porTorneo[t.id]);
+  });
+  update(prev => {
+    const torneos = { ...prev.torneos };
+    bloqueActualizado.forEach(t => {
+      if (!torneos[t.id]) return;
+      torneos[t.id] = { ...torneos[t.id], ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[t.id] };
+    });
+    return { ...prev, torneos };
+  });
+}
+
+// Guarda cambios que no requieren tocar el sorteo: campos compartidos del bloque en
+// todos sus torneos, y los campos propios (incluido un posible renombrado de equipos
+// ya aplicado a torneoPropioActualizado) solo en el torneo editado.
+function guardarCambiosSinResortear(torneoId, torneoPropioActualizado, bloqueActualizado) {
+  update(prev => {
+    const torneos = { ...prev.torneos };
+    bloqueActualizado.forEach(t => {
+      if (!torneos[t.id]) return;
+      if (t.id === torneoId) {
+        torneos[t.id] = {
+          ...torneoPropioActualizado,
+          ...soloCamposCompartidos(t)
+        };
+      } else {
+        torneos[t.id] = { ...torneos[t.id], ...soloCamposCompartidos(t) };
       }
     });
     return { ...prev, torneos };
@@ -2930,6 +3227,100 @@ function renderNewTorneoModal() {
   `;
 }
 
+function renderEditarTorneoModal() {
+  if (!showEditarTorneoModal) return '';
+  const d = editTorneoData;
+  const torneo = getTorneo(d.torneoId);
+  if (!torneo) return '';
+
+  const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length });
+  const hayBloque = !!torneo.bloqueId;
+  const hayGrupos = !!torneo.grupos;
+
+  const equiposInputs = d.equipos.map((e, idx) => `
+    <div class="equipo-editable-row">
+      <input type="text" class="equipo-input-row" placeholder="Equipo ${idx + 1}" maxlength="30" value="${esc(e.nombre)}" oninput="setEditTorneoEquipoNombre(${idx}, this.value)" style="flex:1; margin-bottom:0;" />
+      ${d.equipos.length > 2 ? `<button class="delete-torneo" type="button" onclick="removeEditTorneoEquipo(${idx})" title="Quitar equipo">✕</button>` : ''}
+    </div>
+  `).join('');
+
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeEditarTorneoModal()">
+      <div class="modal-box" style="max-width: 420px; max-height: 88vh; overflow-y: auto;">
+        <h3 class="modal-title">Editar torneo</h3>
+
+        ${hayBloque ? `<div class="competicion-nota">Nombre, fechas, campos y duración se aplican a los dos torneos que se juegan a la vez.</div>` : ''}
+        ${hayGrupos ? `<div class="competicion-nota" style="color:var(--coral); background:rgba(232,105,74,0.08);">⚠️ Los grupos ya están sorteados. Cambiar los equipos, el número de grupos o los clasificados por grupo forzará un nuevo sorteo y se perderán los resultados actuales. Renombrar un equipo sin añadir ni quitar ninguno no afecta al sorteo.</div>` : ''}
+
+        <div class="labeled-field">
+          <label>Nombre del torneo</label>
+          <input type="text" maxlength="60" value="${esc(d.nombre)}" oninput="setEditTorneoField('nombre', this.value)" />
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Inicio</label>
+            <input type="datetime-local" value="${esc(d.fechaInicio)}" oninput="setEditTorneoField('fechaInicio', this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Fin</label>
+            <input type="datetime-local" value="${esc(d.fechaFin)}" oninput="setEditTorneoField('fechaFin', this.value)" />
+          </div>
+        </div>
+
+        <div class="labeled-field">
+          <label>Equipos</label>
+          ${equiposInputs}
+          <button class="add-equipo-btn" type="button" onclick="addEditTorneoEquipo()">+ Añadir equipo</button>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Nº de grupos</label>
+            <select onchange="setEditTorneoNumGrupos(this.value)">
+              ${opcionesNumGrupos(d.equipos.length).map(n => `<option value="${n}" ${n === d.numGrupos ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Clasifican por grupo</label>
+            <select onchange="setEditTorneoClasificados(this.value)">
+              ${opcionesClasificados(d.equipos.length, d.numGrupos).map(n => `<option value="${n}" ${n === d.clasificadosPorGrupo ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="labeled-field">
+          <label>Partidos en fase de grupos (orientativo, siempre se juega todos contra todos)</label>
+          <input type="number" min="0" value="${d.numPartidosGrupo}" onchange="setEditTorneoNumPartidos(this.value)" />
+        </div>
+
+        <div class="labeled-field">
+          <label>Puntos por set</label>
+          <input type="number" min="1" value="${d.puntosPorSet}" onchange="setEditTorneoPuntosPorSet(this.value)" />
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Nº de campos disponibles</label>
+            <input type="number" min="1" value="${d.numCampos}" onchange="setEditTorneoNumCampos(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Duración por partido (min)</label>
+            <input type="number" min="1" value="${d.duracionPartidoMin}" onchange="setEditTorneoDuracionPartido(this.value)" />
+          </div>
+        </div>
+
+        ${errorComp ? `<div class="modal-error">⚠️ ${errorComp}</div>` : ''}
+
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeEditarTorneoModal()">Cancelar</button>
+          <button class="modal-btn confirm" ${errorComp ? 'disabled' : ''} onclick="confirmEditarTorneo()">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderTorneoView() {
   const torneo = getTorneo(view.torneoId);
   if (!torneo) {
@@ -2963,7 +3354,10 @@ function renderTorneoView() {
     <div class="main">
       ${renderTorneoEquiposYGrupos(torneo)}
       ${torneo.grupos ? renderEliminatoriasSection(torneo) : ''}
-      ${puedeGestionarTorneo(torneo) ? `<button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:16px;" onclick="deleteTorneo('${torneo.id}')">🗑 Borrar este torneo</button>` : ''}
+      ${puedeGestionarTorneo(torneo) ? `
+        <button class="back-btn" style="background:rgba(27,94,99,0.1); border-color:rgba(27,94,99,0.3); color:var(--sea-deep); margin-top:16px;" onclick="openEditarTorneoModal('${torneo.id}')">✏️ Editar torneo</button>
+        <button class="back-btn" style="background:rgba(232,105,74,0.1); border-color:rgba(232,105,74,0.3); color:var(--coral); margin-top:8px;" onclick="deleteTorneo('${torneo.id}')">🗑 Borrar este torneo</button>
+      ` : ''}
     </div>
   `;
 }
@@ -3215,7 +3609,7 @@ function render() {
     body = renderTorneoView();
   }
 
-  app.innerHTML = body + renderNewListModal() + renderNewRedModal() + renderNewTorneoModal() + renderNotifyModal();
+  app.innerHTML = body + renderNewListModal() + renderNewRedModal() + renderNewTorneoModal() + renderEditarTorneoModal() + renderNotifyModal();
 }
 
 function renderNotifyModal() {
