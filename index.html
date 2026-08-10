@@ -274,6 +274,16 @@
 .player-time-input:hover { border-color: rgba(27,94,99,0.3); }
 .player-time-input:focus { border-color: var(--sea); cursor: text; }
 
+/* Inputs de resultados: se escribe el número directamente, sin flechas de incremento. */
+.score-input {
+  -moz-appearance: textfield;
+}
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .player-remove {
   background: none;
   border: none;
@@ -1128,6 +1138,10 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
 const CATEGORIAS_TORNEO = ['masculino', 'femenino', 'mixto'];
 const PUNTOS_POR_SET_DEFAULT = 15;
+// Tope de puntos: al llegarlo se gana el set aunque la ventaja sea de un solo punto,
+// para que no se alargue indefinidamente esperando los 2 puntos de diferencia.
+const PUNTOS_MAXIMO_DEFAULT = PUNTOS_POR_SET_DEFAULT + 6;
+const NUM_SETS_DEFAULT = 3;
 const NUM_CAMPOS_DEFAULT = 1;
 const DURACION_PARTIDO_DEFAULT = 20;
 
@@ -1215,6 +1229,8 @@ function emptyTorneo(datos) {
     fechaInicio: datos.fechaInicio,
     fechaFin: datos.fechaFin,
     puntosPorSet: datos.puntosPorSet || PUNTOS_POR_SET_DEFAULT,
+    puntosMaximo: datos.puntosMaximo || PUNTOS_MAXIMO_DEFAULT,
+    numSets: datos.numSets || NUM_SETS_DEFAULT,
     numCampos: datos.numCampos || NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: datos.duracionPartidoMin || DURACION_PARTIDO_DEFAULT,
     // Pausa para comer: hora del día ('HH:mm'), se aplica cada día que dure el torneo.
@@ -1545,6 +1561,20 @@ function validarCompeticion(comp) {
   return null;
 }
 
+// Valida el formato de puntuación compartido por fase de grupos y eliminatorias:
+// el tope debe estar por encima de los puntos por set (si no, el margen de 2 nunca
+// llegaría a decidir el set) y el número de sets debe ser impar para que siempre
+// haya un ganador claro.
+function validarFormatoPartido(d) {
+  if (!(d.puntosMaximo > d.puntosPorSet)) {
+    return `El tope de puntos (${d.puntosMaximo}) debe ser mayor que los puntos por set (${d.puntosPorSet}).`;
+  }
+  if (d.numSets % 2 === 0) {
+    return `El número de sets debe ser impar (1, 3, 5...) para que siempre haya un ganador.`;
+  }
+  return null;
+}
+
 function validarTorneoModal(data) {
   const activas = competicionesActivas(data);
   const dos = activas.length > 1;
@@ -1558,6 +1588,11 @@ function validarTorneoModal(data) {
     if (error) {
       return { valid: false, error: dos ? `⚠️ Torneo ${i + 1}: ${error}` : `⚠️ ${error}` };
     }
+  }
+
+  const errorFormato = validarFormatoPartido(data);
+  if (errorFormato) {
+    return { valid: false, error: `⚠️ ${errorFormato}` };
   }
   return { valid: true, error: null };
 }
@@ -1888,16 +1923,31 @@ function evaluarSetsGanados(partido, lado) {
   return count;
 }
 
-function evaluarGanadorPartido(partido) {
+function evaluarGanadorPartido(partido, numSets) {
+  const setsParaGanar = Math.ceil((numSets || NUM_SETS_DEFAULT) / 2);
   let setsA = 0, setsB = 0;
   (partido.sets || []).forEach(s => {
     if (s.puntosA == null || s.puntosB == null) return;
     if (s.puntosA > s.puntosB) setsA += 1;
     else if (s.puntosB > s.puntosA) setsB += 1;
   });
-  if (setsA >= 2) return partido.equipoA.id;
-  if (setsB >= 2) return partido.equipoB.id;
+  if (setsA >= setsParaGanar) return partido.equipoA.id;
+  if (setsB >= setsParaGanar) return partido.equipoB.id;
   return null;
+}
+
+// Un set/partido a puntos se gana llegando al menos a "puntosPorSet" con 2 de ventaja;
+// para que no se alargue indefinidamente, alcanzar "puntosMaximo" gana directamente
+// aunque la ventaja sea de un solo punto (p.ej. a 15 con tope 21: gana 15-13, 18-16 o
+// 21-20, pero no 15-14 ni 16-15).
+function esResultadoValido(puntosA, puntosB, puntosPorSet, puntosMaximo) {
+  if (puntosA == null || puntosB == null) return true;
+  if (puntosA === puntosB) return false;
+  const max = Math.max(puntosA, puntosB);
+  const diferencia = Math.abs(puntosA - puntosB);
+  if (max > puntosMaximo) return false;
+  if (max === puntosMaximo) return true;
+  return max >= puntosPorSet && diferencia >= 2;
 }
 
 function avanzarGanador(eliminatoria, rondaIdx, partidoIdx) {
@@ -2184,6 +2234,8 @@ function openNewTorneoModal() {
     fechaInicio: '',
     fechaFin: '',
     puntosPorSet: PUNTOS_POR_SET_DEFAULT,
+    puntosMaximo: PUNTOS_MAXIMO_DEFAULT,
+    numSets: NUM_SETS_DEFAULT,
     numCampos: NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: DURACION_PARTIDO_DEFAULT,
     comidaInicio: '',
@@ -2258,6 +2310,14 @@ function setTorneoPuntosPorSet(value) {
   newTorneoData.puntosPorSet = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
 }
 
+function setTorneoPuntosMaximo(value) {
+  newTorneoData.puntosMaximo = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
+}
+
+function setTorneoNumSets(value) {
+  newTorneoData.numSets = Math.max(1, parseInt(value, 10) || NUM_SETS_DEFAULT);
+}
+
 function setTorneoNumCampos(value) {
   newTorneoData.numCampos = Math.max(1, parseInt(value, 10) || NUM_CAMPOS_DEFAULT);
 }
@@ -2322,6 +2382,8 @@ async function confirmNewTorneo() {
     fechaInicio: d.fechaInicio,
     fechaFin: d.fechaFin,
     puntosPorSet: d.puntosPorSet,
+    puntosMaximo: d.puntosMaximo,
+    numSets: d.numSets,
     numCampos: d.numCampos,
     duracionPartidoMin: d.duracionPartidoMin,
     comidaInicio: d.comidaInicio || null,
@@ -2354,6 +2416,8 @@ function openEditarTorneoModal(torneoId) {
     fechaInicio: torneo.fechaInicio,
     fechaFin: torneo.fechaFin,
     puntosPorSet: torneo.puntosPorSet,
+    puntosMaximo: torneo.puntosMaximo,
+    numSets: torneo.numSets,
     numCampos: torneo.numCampos,
     duracionPartidoMin: torneo.duracionPartidoMin,
     comidaInicio: torneo.comidaInicio || '',
@@ -2415,6 +2479,14 @@ function setEditTorneoPuntosPorSet(value) {
   editTorneoData.puntosPorSet = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
 }
 
+function setEditTorneoPuntosMaximo(value) {
+  editTorneoData.puntosMaximo = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
+}
+
+function setEditTorneoNumSets(value) {
+  editTorneoData.numSets = Math.max(1, parseInt(value, 10) || NUM_SETS_DEFAULT);
+}
+
 function setEditTorneoNumCampos(value) {
   editTorneoData.numCampos = Math.max(1, parseInt(value, 10) || NUM_CAMPOS_DEFAULT);
 }
@@ -2457,6 +2529,9 @@ async function confirmEditarTorneo() {
   const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length });
   if (errorComp) { alert(errorComp); return; }
 
+  const errorFormato = validarFormatoPartido(d);
+  if (errorFormato) { alert(errorFormato); return; }
+
   // Los equipos que ya existían conservan su id (para que clasificación/histórico sigan
   // hablando del mismo equipo); los añadidos en este modal (id null) se crean ahora.
   const equiposFinal = d.equipos.map((e, i) => e.id ? { id: e.id, nombre: equiposNombres[i] } : newEquipo(equiposNombres[i]));
@@ -2477,11 +2552,18 @@ async function confirmEditarTorneo() {
 
   const camposCompartidosNuevos = {
     nombre, fechaInicio: d.fechaInicio, fechaFin: d.fechaFin,
-    puntosPorSet: d.puntosPorSet, numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin,
+    puntosPorSet: d.puntosPorSet, puntosMaximo: d.puntosMaximo, numSets: d.numSets,
+    numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin,
     comidaInicio: d.comidaInicio || null, comidaFin: d.comidaFin || null
   };
   const cambianCompartidos = CAMPOS_COMPARTIDOS_BLOQUE.some(c => camposCompartidosNuevos[c] !== torneo[c]);
   const bloqueConCompartidos = torneosDelBloque(torneo).map(t => ({ ...t, ...camposCompartidosNuevos }));
+
+  // El número de sets solo afecta al cuadro de eliminatorias (la fase de grupos
+  // siempre juega un único set): si ya hay un cuadro generado con otro número de
+  // sets, sus resultados dejan de tener sentido y hay que reiniciarlo.
+  const cambiaNumSets = d.numSets !== torneo.numSets && torneo.eliminatoria;
+  if (cambiaNumSets && !confirm('Cambiar el número de sets por partido reiniciará el cuadro de eliminatorias actual (se perderán sus resultados). ¿Continuar?')) return;
 
   if (cambioEstructura) {
     if (torneo.grupos) {
@@ -2503,6 +2585,9 @@ async function confirmEditarTorneo() {
     }
   } else {
     let torneoPropio = { ...torneo, ...camposCompartidosNuevos, numPartidosGrupo: d.numPartidosGrupo };
+    if (cambiaNumSets) {
+      torneoPropio = { ...torneoPropio, eliminatoria: null };
+    }
     if (Object.keys(renombres).length > 0) {
       torneoPropio = renombrarEquiposEnTorneo(torneoPropio, renombres);
     }
@@ -2520,7 +2605,7 @@ async function confirmEditarTorneo() {
 // Campos que un torneo simultáneo comparte con sus hermanos de bloque (ver
 // torneosDelBloque): al editarlos hay que mantenerlos sincronizados, porque
 // programarPartidosBloque solo usa la configuración del primero del bloque.
-const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'numCampos', 'duracionPartidoMin', 'comidaInicio', 'comidaFin'];
+const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'puntosMaximo', 'numSets', 'numCampos', 'duracionPartidoMin', 'comidaInicio', 'comidaFin'];
 
 function soloCamposCompartidos(t) {
   const campos = {};
@@ -2647,6 +2732,12 @@ function guardarCambiosSinResortear(torneoId, torneoPropioActualizado, bloqueAct
 function setResultadoPartidoGrupo(torneoId, partidoId, puntosA, puntosB) {
   const a = (puntosA === '' || puntosA == null) ? null : Math.max(0, parseInt(puntosA, 10) || 0);
   const b = (puntosB === '' || puntosB == null) ? null : Math.max(0, parseInt(puntosB, 10) || 0);
+  const torneo = getTorneo(torneoId);
+  if (torneo && !esResultadoValido(a, b, torneo.puntosPorSet, torneo.puntosMaximo)) {
+    alert(`Resultado no válido: hay que ganar por 2 puntos de diferencia a partir de ${torneo.puntosPorSet} (o llegar directamente a ${torneo.puntosMaximo}).`);
+    render();
+    return;
+  }
   updateTorneo(torneoId, prev => ({
     ...prev,
     partidosGrupo: prev.partidosGrupo.map(p => p.id === partidoId ? { ...p, puntosA: a, puntosB: b } : p),
@@ -2674,7 +2765,7 @@ function generarEliminatorias(torneoId) {
         slotIndex: i,
         equipoA: null,
         equipoB: null,
-        sets: [{ puntosA: null, puntosB: null }, { puntosA: null, puntosB: null }, { puntosA: null, puntosB: null }],
+        sets: Array.from({ length: torneo.numSets || NUM_SETS_DEFAULT }, () => ({ puntosA: null, puntosB: null })),
         ganadorId: null
       });
     }
@@ -2697,6 +2788,12 @@ function generarEliminatorias(torneoId) {
 function setResultadoSetEliminatoria(torneoId, partidoId, setIndex, puntosA, puntosB) {
   const a = (puntosA === '' || puntosA == null) ? null : Math.max(0, parseInt(puntosA, 10) || 0);
   const b = (puntosB === '' || puntosB == null) ? null : Math.max(0, parseInt(puntosB, 10) || 0);
+  const torneo = getTorneo(torneoId);
+  if (torneo && !esResultadoValido(a, b, torneo.puntosPorSet, torneo.puntosMaximo)) {
+    alert(`Resultado no válido: hay que ganar el set por 2 puntos de diferencia a partir de ${torneo.puntosPorSet} (o llegar directamente a ${torneo.puntosMaximo}).`);
+    render();
+    return;
+  }
 
   updateTorneo(torneoId, prev => {
     const eliminatoria = JSON.parse(JSON.stringify(prev.eliminatoria));
@@ -2709,7 +2806,7 @@ function setResultadoSetEliminatoria(torneoId, partidoId, setIndex, puntosA, pun
     if (rondaIdx === -1) return prev;
     const partido = eliminatoria.rondas[rondaIdx].partidos[partidoIdx];
     partido.sets[setIndex] = { puntosA: a, puntosB: b };
-    partido.ganadorId = (partido.equipoA && partido.equipoB) ? evaluarGanadorPartido(partido) : null;
+    partido.ganadorId = (partido.equipoA && partido.equipoB) ? evaluarGanadorPartido(partido, prev.numSets) : null;
     if (partido.ganadorId) {
       avanzarGanador(eliminatoria, rondaIdx, partidoIdx);
     }
@@ -3259,9 +3356,21 @@ function renderNewTorneoModal() {
 
         ${camposCompeticiones}
 
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos por set</label>
+            <input type="number" min="1" id="torneo-puntos-set" value="${d.puntosPorSet}" onchange="setTorneoPuntosPorSet(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos máximo (tope)</label>
+            <input type="number" min="1" id="torneo-puntos-maximo" value="${d.puntosMaximo}" onchange="setTorneoPuntosMaximo(this.value)" />
+          </div>
+        </div>
+        <div class="competicion-nota">Cada set se gana con 2 puntos de ventaja a partir de los puntos por set; para que no se alargue, al llegar al tope se gana aunque sea por 1 (p.ej. a 15 con tope 21: gana 15-13, 18-16 o 21-20).</div>
+
         <div class="labeled-field">
-          <label>Puntos por set</label>
-          <input type="number" min="1" id="torneo-puntos-set" value="${d.puntosPorSet}" onchange="setTorneoPuntosPorSet(this.value)" />
+          <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
+          <input type="number" min="1" step="2" id="torneo-num-sets" value="${d.numSets}" onchange="setTorneoNumSets(this.value)" />
         </div>
 
         <div style="display:flex; gap:10px;">
@@ -3307,7 +3416,8 @@ function renderEditarTorneoModal() {
   if (!torneo) return '';
 
   const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length })
-    || validarComida(d.comidaInicio, d.comidaFin);
+    || validarComida(d.comidaInicio, d.comidaFin)
+    || validarFormatoPartido(d);
   const hayBloque = !!torneo.bloqueId;
   const hayGrupos = !!torneo.grupos;
 
@@ -3368,9 +3478,21 @@ function renderEditarTorneoModal() {
           <input type="number" min="0" value="${d.numPartidosGrupo}" onchange="setEditTorneoNumPartidos(this.value)" />
         </div>
 
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos por set</label>
+            <input type="number" min="1" value="${d.puntosPorSet}" onchange="setEditTorneoPuntosPorSet(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos máximo (tope)</label>
+            <input type="number" min="1" value="${d.puntosMaximo}" onchange="setEditTorneoPuntosMaximo(this.value)" />
+          </div>
+        </div>
+        <div class="competicion-nota">Cada set se gana con 2 puntos de ventaja a partir de los puntos por set; para que no se alargue, al llegar al tope se gana aunque sea por 1 (p.ej. a 15 con tope 21: gana 15-13, 18-16 o 21-20).</div>
+
         <div class="labeled-field">
-          <label>Puntos por set</label>
-          <input type="number" min="1" value="${d.puntosPorSet}" onchange="setEditTorneoPuntosPorSet(this.value)" />
+          <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
+          <input type="number" min="1" step="2" value="${d.numSets}" onchange="setEditTorneoNumSets(this.value)" />
         </div>
 
         <div style="display:flex; gap:10px;">
@@ -3609,9 +3731,9 @@ function renderPartidoGrupoRow(torneo, partido) {
     ${meta}
     <div class="player-row">
       <span class="player-name">${esc(partido.equipoA.nombre)}</span>
-      <input type="number" min="0" id="${idA}" class="player-time-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idA}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
       <span>–</span>
-      <input type="number" min="0" id="${idB}" class="player-time-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', document.getElementById('${idA}').value, this.value)" />
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idB}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', document.getElementById('${idA}').value, this.value)" />
       <span class="player-name" style="text-align:right;">${esc(partido.equipoB.nombre)}</span>
     </div>
   `;
@@ -3656,17 +3778,19 @@ function renderPartidoEliminatoria(torneo, partido) {
 
   let setsHtml = '';
   if (puedeJugarse) {
+    const totalSets = torneo.numSets || NUM_SETS_DEFAULT;
+    const setsParaGanar = Math.ceil(totalSets / 2);
     let ganadosA = 0, ganadosB = 0;
-    for (let s = 0; s < 3; s++) {
-      if (ganadosA >= 2 || ganadosB >= 2) break;
+    for (let s = 0; s < totalSets; s++) {
+      if (ganadosA >= setsParaGanar || ganadosB >= setsParaGanar) break;
       const set = partido.sets[s] || { puntosA: null, puntosB: null };
       const idA = `pe-${partido.id}-${s}-a`;
       const idB = `pe-${partido.id}-${s}-b`;
       setsHtml += `
         <div class="bracket-set-row">
           <span>Set ${s + 1}</span>
-          <input type="number" min="0" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, this.value, document.getElementById('${idB}').value)" />
-          <input type="number" min="0" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, document.getElementById('${idA}').value, this.value)" />
+          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, this.value, document.getElementById('${idB}').value)" />
+          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, document.getElementById('${idA}').value, this.value)" />
         </div>
       `;
       if (set.puntosA != null && set.puntosB != null) {
@@ -3796,9 +3920,9 @@ function sanitizeSet(s) {
   return { puntosA: sanitizePuntos(s && s.puntosA), puntosB: sanitizePuntos(s && s.puntosB) };
 }
 
-function sanitizePartidoEliminatoria(p, i) {
+function sanitizePartidoEliminatoria(p, i, numSets) {
   const setsRaw = (p && Array.isArray(p.sets)) ? p.sets : [];
-  const sets = [0, 1, 2].map(idx => sanitizeSet(setsRaw[idx]));
+  const sets = Array.from({ length: numSets }, (_, idx) => sanitizeSet(setsRaw[idx]));
   return {
     id: (p && p.id) || uid(),
     slotIndex: (p && typeof p.slotIndex === 'number') ? p.slotIndex : i,
@@ -3809,17 +3933,18 @@ function sanitizePartidoEliminatoria(p, i) {
   };
 }
 
-function sanitizeEliminatoria(e) {
+function sanitizeEliminatoria(e, numSets) {
   if (!e || !Array.isArray(e.rondas)) return null;
   const rondas = e.rondas.map(r => ({
     nombre: (r && typeof r.nombre === 'string') ? r.nombre : '',
-    partidos: (r && Array.isArray(r.partidos)) ? r.partidos.map(sanitizePartidoEliminatoria) : []
+    partidos: (r && Array.isArray(r.partidos)) ? r.partidos.map((p, i) => sanitizePartidoEliminatoria(p, i, numSets)) : []
   }));
   return { rondas };
 }
 
 function sanitizeTorneo(t) {
   const equipos = (t && Array.isArray(t.equipos)) ? t.equipos.map(sanitizeEquipo) : [];
+  const numSets = (t && typeof t.numSets === 'number') ? t.numSets : NUM_SETS_DEFAULT;
   return {
     id: (t && t.id) || uid(),
     nombre: (t && typeof t.nombre === 'string') ? t.nombre : '',
@@ -3827,6 +3952,8 @@ function sanitizeTorneo(t) {
     fechaInicio: (t && typeof t.fechaInicio === 'string') ? t.fechaInicio : '',
     fechaFin: (t && typeof t.fechaFin === 'string') ? t.fechaFin : '',
     puntosPorSet: (t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT,
+    puntosMaximo: (t && typeof t.puntosMaximo === 'number') ? t.puntosMaximo : PUNTOS_MAXIMO_DEFAULT,
+    numSets,
     numCampos: (t && typeof t.numCampos === 'number') ? t.numCampos : NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: (t && typeof t.duracionPartidoMin === 'number') ? t.duracionPartidoMin : DURACION_PARTIDO_DEFAULT,
     comidaInicio: (t && typeof t.comidaInicio === 'string') ? t.comidaInicio : null,
@@ -3840,7 +3967,7 @@ function sanitizeTorneo(t) {
     grupos: (t && Array.isArray(t.grupos)) ? t.grupos.map(sanitizeGrupo) : null,
     sorteoConfirmado: !!(t && t.sorteoConfirmado),
     partidosGrupo: (t && Array.isArray(t.partidosGrupo)) ? t.partidosGrupo.map(sanitizePartidoGrupo) : [],
-    eliminatoria: sanitizeEliminatoria(t && t.eliminatoria),
+    eliminatoria: sanitizeEliminatoria(t && t.eliminatoria, numSets),
     creatorOwner: (t && t.creatorOwner) || null,
     historial: (t && Array.isArray(t.historial)) ? t.historial : []
   };
