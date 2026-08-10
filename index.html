@@ -1454,6 +1454,24 @@ function sugerirClasificados() {
   return 2;
 }
 
+// Potencias de dos desde 1 hasta max (inclusive). Se usan para limitar los desplegables
+// de "Nº de grupos" y "Clasifican por grupo" a combinaciones que siempre son válidas
+// (grupos × clasificados es automáticamente potencia de 2 si ambos lo son).
+function opcionesPotenciasDeDosHasta(max) {
+  const opciones = [];
+  for (let p = 1; p <= max; p *= 2) opciones.push(p);
+  return opciones.length ? opciones : [1];
+}
+
+function opcionesNumGrupos(numEquipos) {
+  return opcionesPotenciasDeDosHasta(Math.max(1, numEquipos));
+}
+
+function opcionesClasificados(numEquipos, numGrupos) {
+  const maxPorGrupo = Math.max(1, Math.floor(numEquipos / Math.max(1, numGrupos)));
+  return opcionesPotenciasDeDosHasta(maxPorGrupo);
+}
+
 function sugerirNumPartidos(numEquipos, numGrupos) {
   const tam = Math.max(1, Math.round(numEquipos / Math.max(1, numGrupos)));
   return Math.round(tam * (tam - 1) / 2);
@@ -2100,9 +2118,19 @@ function setTorneoTipo(value) {
   render();
 }
 
-// numGrupos/clasificadosPorGrupo sí necesitan render (afectan a la validación en vivo).
+// numGrupos/clasificadosPorGrupo sí necesitan render (afectan a los desplegables y a
+// las sugerencias). Ambos campos son <select> con solo opciones válidas (potencias de
+// 2), así que grupos × clasificados siempre da una potencia de 2 automáticamente.
 function setTorneoNumGrupos(i, value) {
-  newTorneoData.competiciones[i].numGrupos = Math.max(1, parseInt(value, 10) || 1);
+  const comp = newTorneoData.competiciones[i];
+  comp.numGrupos = Math.max(1, parseInt(value, 10) || 1);
+  // Al cambiar el número de grupos puede que "clasificados" ya no quepa en el grupo
+  // más pequeño (p.ej. 4 clasificados con grupos de 2 equipos): se ajusta al mayor
+  // valor válido disponible.
+  const opciones = opcionesClasificados(comp.numEquipos, comp.numGrupos);
+  if (!opciones.includes(comp.clasificadosPorGrupo)) {
+    comp.clasificadosPorGrupo = opciones[opciones.length - 1];
+  }
   render();
 }
 
@@ -2811,11 +2839,15 @@ function renderCompeticionCampos(d, comp, i) {
       <div style="display:flex; gap:10px;">
         <div class="labeled-field" style="flex:1;">
           <label>Nº de grupos</label>
-          <input type="number" min="1" id="torneo-${i}-num-grupos" value="${comp.numGrupos}" onchange="setTorneoNumGrupos(${i}, this.value)" />
+          <select id="torneo-${i}-num-grupos" onchange="setTorneoNumGrupos(${i}, this.value)">
+            ${opcionesNumGrupos(comp.numEquipos).map(n => `<option value="${n}" ${n === comp.numGrupos ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
         </div>
         <div class="labeled-field" style="flex:1;">
           <label>Clasifican por grupo</label>
-          <input type="number" min="1" id="torneo-${i}-clasificados" value="${comp.clasificadosPorGrupo}" onchange="setTorneoClasificados(${i}, this.value)" />
+          <select id="torneo-${i}-clasificados" onchange="setTorneoClasificados(${i}, this.value)">
+            ${opcionesClasificados(comp.numEquipos, comp.numGrupos).map(n => `<option value="${n}" ${n === comp.clasificadosPorGrupo ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
         </div>
       </div>
 
