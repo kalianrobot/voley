@@ -975,6 +975,12 @@
   flex-shrink: 0;
 }
 
+.horario-arbitro {
+  font-size: 11.5px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
 .horario-aviso {
   font-size: 12px;
   line-height: 1.4;
@@ -1608,6 +1614,45 @@ function programarPartidosGrupo(torneo) {
   return { partidos: porTorneo[torneo.id], horaFinEstimada, excedeFin };
 }
 
+// Asigna árbitro a cada partido de grupo: un equipo del mismo torneo (misma categoría,
+// por construcción, ya que solo se mira dentro de sus propios equipos) que no juegue
+// en esa franja horaria. Reparte el arbitraje lo más equitativamente posible entre los
+// equipos libres de cada franja; si no hay bastantes libres para todos los partidos
+// simultáneos, esos partidos se quedan sin árbitro (no se reutiliza un equipo ocupado).
+function asignarArbitros(equiposTorneo, partidos) {
+  const contador = {};
+  equiposTorneo.forEach(e => { contador[e.id] = 0; });
+
+  const porHora = {};
+  partidos.forEach(p => {
+    const key = p.horaInicio || '';
+    if (!porHora[key]) porHora[key] = [];
+    porHora[key].push(p);
+  });
+
+  const resultado = partidos.map(p => ({ ...p, arbitro: null }));
+  const porId = {};
+  resultado.forEach(p => { porId[p.id] = p; });
+
+  Object.keys(porHora).sort().forEach(hora => {
+    const partidosSlot = porHora[hora];
+    const ocupados = new Set(partidosSlot.flatMap(p => [p.equipoA.id, p.equipoB.id]));
+    const libres = equiposTorneo
+      .filter(e => !ocupados.has(e.id))
+      .sort((a, b) => contador[a.id] - contador[b.id]);
+    const usados = new Set();
+    partidosSlot.forEach(p => {
+      const candidato = libres.find(e => !usados.has(e.id));
+      if (!candidato) return;
+      porId[p.id].arbitro = { id: candidato.id, nombre: candidato.nombre };
+      usados.add(candidato.id);
+      contador[candidato.id]++;
+    });
+  });
+
+  return resultado;
+}
+
 function calcularClasificacionGrupo(torneo, grupoId) {
   const grupo = (torneo.grupos || []).find(g => g.id === grupoId);
   if (!grupo) return [];
@@ -2187,21 +2232,28 @@ function sortearGrupos(torneoId) {
     alert('⚠️ Con los campos y la duración configurados, la fase de grupos no cabe antes de la fecha/hora de fin del torneo. Se ha generado igualmente el horario completo.');
   }
 
+  // El árbitro se asigna por torneo (equipos de la propia categoría), una vez ya
+  // repartidas hora y campo de todo el bloque.
+  const porTorneoConArbitros = {};
+  bloque.forEach(t => {
+    porTorneoConArbitros[t.id] = asignarArbitros(t.equipos, porTorneo[t.id]);
+  });
+
   update(prev => {
     const torneos = { ...prev.torneos };
-    Object.keys(porTorneo).forEach(id => {
+    Object.keys(porTorneoConArbitros).forEach(id => {
       if (!torneos[id]) return;
       if (id === torneoId) {
         torneos[id] = {
           ...torneos[id],
           grupos,
-          partidosGrupo: porTorneo[id],
+          partidosGrupo: porTorneoConArbitros[id],
           sorteoConfirmado: false,
           eliminatoria: null,
           historial: agregarHistorial(torneos[id].historial, `🎲 Sorteo de grupos realizado (${numGrupos} grupos)`)
         };
       } else {
-        torneos[id] = { ...torneos[id], partidosGrupo: porTorneo[id] };
+        torneos[id] = { ...torneos[id], partidosGrupo: porTorneoConArbitros[id] };
       }
     });
     return { ...prev, torneos };
@@ -2299,7 +2351,9 @@ function deleteTorneo(torneoId) {
   if (hermanos.length === 1) {
     const solo = { ...hermanos[0], bloqueId: null, ordenBloque: 0 };
     const { porTorneo } = programarPartidosBloque([solo]);
-    superviviente = { ...solo, partidosGrupo: porTorneo[solo.id] };
+    // Las horas cambian al recompactar, así que los árbitros se reasignan desde cero
+    // (quién estaba "libre en ese momento" ya no es lo mismo).
+    superviviente = { ...solo, partidosGrupo: asignarArbitros(solo.equipos, porTorneo[solo.id]) };
   }
 
   update(prev => {
@@ -2946,6 +3000,7 @@ function renderHorarioGeneral(torneo) {
           ${hayVarios ? `<span class="horario-torneo-badge">${esc(capitalizar(t.categoria))}</span>` : ''}
           <span>${esc(p.equipoA.nombre)} vs ${esc(p.equipoB.nombre)}</span>
           <span style="opacity:0.5;">${esc(grupoPorId[p.grupoId] || '')}</span>
+          ${p.arbitro ? `<span class="horario-arbitro">Árbitro: ${esc(p.arbitro.nombre)}</span>` : ''}
         </div>
       `).join('');
     return `
@@ -3013,7 +3068,7 @@ function renderPartidoGrupoRow(torneo, partido) {
   const idA = `pg-a-${partido.id}`;
   const idB = `pg-b-${partido.id}`;
   const meta = partido.horaInicio
-    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo}</div>`
+    ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo}${partido.arbitro ? ` · Árbitro: ${esc(partido.arbitro.nombre)}` : ''}</div>`
     : '';
   return `
     ${meta}
@@ -3197,7 +3252,8 @@ function sanitizePartidoGrupo(p) {
     puntosA: sanitizePuntos(p && p.puntosA),
     puntosB: sanitizePuntos(p && p.puntosB),
     campo: (p && typeof p.campo === 'number') ? p.campo : null,
-    horaInicio: (p && typeof p.horaInicio === 'string') ? p.horaInicio : null
+    horaInicio: (p && typeof p.horaInicio === 'string') ? p.horaInicio : null,
+    arbitro: (p && p.arbitro) ? sanitizeEquipo(p.arbitro) : null
   };
 }
 
