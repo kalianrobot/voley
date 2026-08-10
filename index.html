@@ -991,6 +991,12 @@
   font-weight: 700;
 }
 
+.horario-comida {
+  background: rgba(176,134,66,0.06);
+  border-radius: 8px;
+}
+.horario-comida .horario-hora { color: var(--waiting); }
+
 .horario-aviso {
   font-size: 12px;
   line-height: 1.4;
@@ -1211,6 +1217,10 @@ function emptyTorneo(datos) {
     puntosPorSet: datos.puntosPorSet || PUNTOS_POR_SET_DEFAULT,
     numCampos: datos.numCampos || NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: datos.duracionPartidoMin || DURACION_PARTIDO_DEFAULT,
+    // Pausa para comer: hora del día ('HH:mm'), se aplica cada día que dure el torneo.
+    // null = sin pausa configurada.
+    comidaInicio: datos.comidaInicio || null,
+    comidaFin: datos.comidaFin || null,
     equipos: datos.equipos,
     numGrupos: datos.numGrupos,
     numPartidosGrupo: datos.numPartidosGrupo,
@@ -1511,6 +1521,19 @@ function sugerirNumPartidos(numEquipos, numGrupos) {
   return Math.round(tam * (tam - 1) / 2);
 }
 
+// Devuelve un mensaje de error (o null) para la pausa de comer: ambos campos vacíos
+// (sin pausa) es válido; si se rellena uno, el otro también es obligatorio.
+function validarComida(comidaInicio, comidaFin) {
+  if (!comidaInicio && !comidaFin) return null;
+  if (!comidaInicio || !comidaFin) {
+    return 'Si indicas la pausa para comer, hace falta tanto la hora de inicio como la de fin';
+  }
+  if (comidaFin <= comidaInicio) {
+    return 'La hora de fin de la comida debe ser posterior a la de inicio';
+  }
+  return null;
+}
+
 function validarCompeticion(comp) {
   const producto = comp.numGrupos * comp.clasificadosPorGrupo;
   if (!esPotenciaDeDos(producto)) {
@@ -1619,6 +1642,19 @@ function tandasDePartidos(partidos, numCampos) {
   return tandas;
 }
 
+// Si `momentoMs` cae dentro de la pausa para comer de ESE día ('HH:mm'-'HH:mm',
+// se repite cada día que dure el torneo), lo adelanta hasta el final de la pausa.
+// Sin comidaInicio/comidaFin configurados es un no-op.
+function saltarComidaSiHaceFalta(momentoMs, comidaInicio, comidaFin) {
+  if (!comidaInicio || !comidaFin) return momentoMs;
+  const d = new Date(momentoMs);
+  const [hIni, mIni] = comidaInicio.split(':').map(Number);
+  const [hFin, mFin] = comidaFin.split(':').map(Number);
+  const inicioMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hIni, mIni).getTime();
+  const finMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hFin, mFin).getTime();
+  return (momentoMs >= inicioMs && momentoMs < finMs) ? finMs : momentoMs;
+}
+
 // Asigna hora y campo a los partidos de fase de grupos de todo un bloque de torneos
 // simultáneos. Las tandas de cada torneo se van intercalando franja a franja, de modo
 // que mientras un torneo ocupa los campos el otro descansa (y quien juega los dos
@@ -1638,25 +1674,27 @@ function programarPartidosBloque(torneos) {
   });
 
   const siguiente = tandasPorTorneo.map(() => 0);
-  let slot = 0;
+  let cursor = inicio;
   let quedan = true;
   while (quedan) {
     quedan = false;
     for (let k = 0; k < tandasPorTorneo.length; k++) {
       if (siguiente[k] >= tandasPorTorneo[k].length) continue;
+      cursor = saltarComidaSiHaceFalta(cursor, config.comidaInicio, config.comidaFin);
       const tanda = tandasPorTorneo[k][siguiente[k]];
       siguiente[k] += 1;
-      const hora = toDateTimeLocalString(new Date(inicio + slot * duracionMs));
+      const hora = toDateTimeLocalString(new Date(cursor));
       tanda.forEach((partido, i) => {
         partido.campo = i + 1;
         partido.horaInicio = hora;
       });
-      slot += 1;
+      cursor += duracionMs;
       if (siguiente[k] < tandasPorTorneo[k].length) quedan = true;
     }
   }
 
-  const horaFinEstimada = toDateTimeLocalString(new Date(inicio + slot * duracionMs));
+  cursor = saltarComidaSiHaceFalta(cursor, config.comidaInicio, config.comidaFin);
+  const horaFinEstimada = toDateTimeLocalString(new Date(cursor));
   const excedeFin = !!config.fechaFin && horaFinEstimada > config.fechaFin;
   return { porTorneo, horaFinEstimada, excedeFin };
 }
@@ -2148,6 +2186,8 @@ function openNewTorneoModal() {
     puntosPorSet: PUNTOS_POR_SET_DEFAULT,
     numCampos: NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: DURACION_PARTIDO_DEFAULT,
+    comidaInicio: '',
+    comidaFin: '',
     competiciones: [nuevaCompeticionBorrador('mixto'), nuevaCompeticionBorrador('masculino')]
   };
   showNewTorneoModal = true;
@@ -2253,6 +2293,8 @@ async function confirmNewTorneo() {
   if (!nombre) { alert('Debes indicar un nombre para el torneo'); return; }
   if (!d.fechaInicio || !d.fechaFin) { alert('Debes indicar fecha y hora de inicio y de fin'); return; }
   if (d.fechaFin <= d.fechaInicio) { alert('La fecha de fin debe ser posterior a la de inicio'); return; }
+  const errorComida = validarComida(d.comidaInicio, d.comidaFin);
+  if (errorComida) { alert(errorComida); return; }
 
   const activas = competicionesActivas(d);
   const dos = activas.length > 1;
@@ -2282,6 +2324,8 @@ async function confirmNewTorneo() {
     puntosPorSet: d.puntosPorSet,
     numCampos: d.numCampos,
     duracionPartidoMin: d.duracionPartidoMin,
+    comidaInicio: d.comidaInicio || null,
+    comidaFin: d.comidaFin || null,
     equipos: comp.equiposNombres.map(n => newEquipo(n.trim())),
     numGrupos: comp.numGrupos,
     numPartidosGrupo: comp.numPartidosGrupo,
@@ -2312,6 +2356,8 @@ function openEditarTorneoModal(torneoId) {
     puntosPorSet: torneo.puntosPorSet,
     numCampos: torneo.numCampos,
     duracionPartidoMin: torneo.duracionPartidoMin,
+    comidaInicio: torneo.comidaInicio || '',
+    comidaFin: torneo.comidaFin || '',
     equipos: torneo.equipos.map(e => ({ ...e })),
     numGrupos: torneo.numGrupos,
     clasificadosPorGrupo: torneo.clasificadosPorGrupo,
@@ -2399,6 +2445,8 @@ async function confirmEditarTorneo() {
   if (!nombre) { alert('Debes indicar un nombre para el torneo'); return; }
   if (!d.fechaInicio || !d.fechaFin) { alert('Debes indicar fecha y hora de inicio y de fin'); return; }
   if (d.fechaFin <= d.fechaInicio) { alert('La fecha de fin debe ser posterior a la de inicio'); return; }
+  const errorComida = validarComida(d.comidaInicio, d.comidaFin);
+  if (errorComida) { alert(errorComida); return; }
 
   const equiposNombres = d.equipos.map(e => (e.nombre || '').trim());
   if (equiposNombres.length < 2 || equiposNombres.some(n => !n)) {
@@ -2429,7 +2477,8 @@ async function confirmEditarTorneo() {
 
   const camposCompartidosNuevos = {
     nombre, fechaInicio: d.fechaInicio, fechaFin: d.fechaFin,
-    puntosPorSet: d.puntosPorSet, numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin
+    puntosPorSet: d.puntosPorSet, numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin,
+    comidaInicio: d.comidaInicio || null, comidaFin: d.comidaFin || null
   };
   const cambianCompartidos = CAMPOS_COMPARTIDOS_BLOQUE.some(c => camposCompartidosNuevos[c] !== torneo[c]);
   const bloqueConCompartidos = torneosDelBloque(torneo).map(t => ({ ...t, ...camposCompartidosNuevos }));
@@ -2471,7 +2520,7 @@ async function confirmEditarTorneo() {
 // Campos que un torneo simultáneo comparte con sus hermanos de bloque (ver
 // torneosDelBloque): al editarlos hay que mantenerlos sincronizados, porque
 // programarPartidosBloque solo usa la configuración del primero del bloque.
-const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'numCampos', 'duracionPartidoMin'];
+const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'numCampos', 'duracionPartidoMin', 'comidaInicio', 'comidaFin'];
 
 function soloCamposCompartidos(t) {
   const campos = {};
@@ -3226,6 +3275,20 @@ function renderNewTorneoModal() {
           </div>
         </div>
 
+        <div class="labeled-field">
+          <label>🍽️ Pausa para comer (opcional)</label>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Inicio de la comida</label>
+            <input type="time" id="torneo-comida-inicio" value="${esc(d.comidaInicio)}" oninput="setTorneoField('comidaInicio', this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Fin de la comida</label>
+            <input type="time" id="torneo-comida-fin" value="${esc(d.comidaFin)}" oninput="setTorneoField('comidaFin', this.value)" />
+          </div>
+        </div>
+
         ${validacion.valid ? '' : `<div class="modal-error">${validacion.error}</div>`}
 
         <div class="modal-actions">
@@ -3243,7 +3306,8 @@ function renderEditarTorneoModal() {
   const torneo = getTorneo(d.torneoId);
   if (!torneo) return '';
 
-  const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length });
+  const errorComp = validarCompeticion({ numGrupos: d.numGrupos, clasificadosPorGrupo: d.clasificadosPorGrupo, numEquipos: d.equipos.length })
+    || validarComida(d.comidaInicio, d.comidaFin);
   const hayBloque = !!torneo.bloqueId;
   const hayGrupos = !!torneo.grupos;
 
@@ -3317,6 +3381,20 @@ function renderEditarTorneoModal() {
           <div class="labeled-field" style="flex:1;">
             <label>Duración por partido (min)</label>
             <input type="number" min="1" value="${d.duracionPartidoMin}" onchange="setEditTorneoDuracionPartido(this.value)" />
+          </div>
+        </div>
+
+        <div class="labeled-field">
+          <label>🍽️ Pausa para comer (opcional)</label>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Inicio de la comida</label>
+            <input type="time" value="${esc(d.comidaInicio)}" oninput="setEditTorneoField('comidaInicio', this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Fin de la comida</label>
+            <input type="time" value="${esc(d.comidaFin)}" oninput="setEditTorneoField('comidaFin', this.value)" />
           </div>
         </div>
 
@@ -3426,7 +3504,24 @@ function renderHorarioGeneral(torneo) {
     porHora[key].push(e);
   });
 
-  const filas = Object.keys(porHora).sort().map(hora => {
+  const { comidaInicio, comidaFin } = torneo;
+  const horasOrdenadas = Object.keys(porHora).sort();
+  const filas = horasOrdenadas.map((hora, idx) => {
+    let filaComida = '';
+    if (comidaInicio && comidaFin && hora && idx > 0) {
+      const diaActual = hora.slice(0, 10);
+      const horaAnterior = horasOrdenadas[idx - 1];
+      if (horaAnterior.slice(0, 10) === diaActual
+        && horaAnterior.slice(11, 16) < comidaInicio
+        && hora.slice(11, 16) >= comidaFin) {
+        filaComida = `
+          <div class="horario-fila horario-comida">
+            <div class="horario-hora">🍽️ ${comidaInicio}–${comidaFin}</div>
+            <div class="horario-celdas"><span style="opacity:0.6;">Pausa para comer</span></div>
+          </div>
+        `;
+      }
+    }
     const celdas = porHora[hora]
       .slice()
       .sort((a, b) => (a.partido.campo || 0) - (b.partido.campo || 0))
@@ -3440,6 +3535,7 @@ function renderHorarioGeneral(torneo) {
         </div>
       `).join('');
     return `
+      ${filaComida}
       <div class="horario-fila">
         <div class="horario-hora">${hora ? formatFechaHoraCorta(hora) : '—'}</div>
         <div class="horario-celdas">${celdas}</div>
@@ -3733,6 +3829,8 @@ function sanitizeTorneo(t) {
     puntosPorSet: (t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT,
     numCampos: (t && typeof t.numCampos === 'number') ? t.numCampos : NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: (t && typeof t.duracionPartidoMin === 'number') ? t.duracionPartidoMin : DURACION_PARTIDO_DEFAULT,
+    comidaInicio: (t && typeof t.comidaInicio === 'string') ? t.comidaInicio : null,
+    comidaFin: (t && typeof t.comidaFin === 'string') ? t.comidaFin : null,
     equipos,
     numGrupos: (t && typeof t.numGrupos === 'number') ? t.numGrupos : 1,
     numPartidosGrupo: (t && typeof t.numPartidosGrupo === 'number') ? t.numPartidosGrupo : 0,
