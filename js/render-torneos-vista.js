@@ -205,13 +205,32 @@ function renderPartidoGrupoRow(torneo, partido, estadoCampos) {
     ? `<div class="partido-meta">${formatFechaHoraCorta(partido.horaInicio)} · Campo ${partido.campo} · ${arbitroTexto}${etiquetaEstado}</div>`
     : '';
   const filaClase = estado === 'jugado' ? ' partido-jugado' : (estado === 'actual' ? ' partido-actual' : '');
+
+  // Un resultado sin completar siempre se muestra editable; uno ya guardado
+  // se cierra (marcador + botón editar) salvo que se haya reabierto a
+  // propósito. Los inputs no autoguardan: solo se guarda al pulsar ✓, así
+  // el DOM no se destruye a mitad de escribir el segundo marcador.
+  const completo = partido.puntosA != null && partido.puntosB != null;
+  const editando = !completo || partidosGrupoEnEdicion.has(partido.id);
+  const marcador = editando
+    ? `
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idA}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" />
+      <span>–</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idB}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" />
+      <button class="confirmar-resultado" title="Confirmar resultado" onclick="confirmarResultadoPartidoGrupo('${torneo.id}','${partido.id}')">✓</button>
+    `
+    : `
+      <span class="player-time">${partido.puntosA}</span>
+      <span>–</span>
+      <span class="player-time">${partido.puntosB}</span>
+      <button class="editar-resultado" title="Editar resultado" onclick="editarResultadoPartidoGrupo('${partido.id}')">✏️</button>
+    `;
+
   return `
     ${meta}
     <div class="player-row${filaClase}">
       <span class="player-name">${esc(partido.equipoA.nombre)}</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idA}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', this.value, document.getElementById('${idB}').value)" />
-      <span>–</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idB}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" onchange="setResultadoPartidoGrupo('${torneo.id}','${partido.id}', document.getElementById('${idA}').value, this.value)" />
+      ${marcador}
       <span class="player-name" style="text-align:right;">${esc(partido.equipoB.nombre)}</span>
     </div>
   `;
@@ -264,11 +283,23 @@ function renderPartidoEliminatoria(torneo, partido) {
       const set = partido.sets[s] || { puntosA: null, puntosB: null };
       const idA = `pe-${partido.id}-${s}-a`;
       const idB = `pe-${partido.id}-${s}-b`;
+      const completo = set.puntosA != null && set.puntosB != null;
+      const editando = !completo || setsEliminatoriaEnEdicion.has(`${partido.id}:${s}`);
+      const marcadorSet = editando
+        ? `
+          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" />
+          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" />
+          <button class="confirmar-resultado" title="Confirmar resultado" onclick="confirmarResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s})">✓</button>
+        `
+        : `
+          <span class="player-time">${set.puntosA}</span>
+          <span class="player-time">${set.puntosB}</span>
+          <button class="editar-resultado" title="Editar resultado" onclick="editarResultadoSetEliminatoria('${partido.id}',${s})">✏️</button>
+        `;
       setsHtml += `
         <div class="bracket-set-row">
           <span>Set ${s + 1}</span>
-          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, this.value, document.getElementById('${idB}').value)" />
-          <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" onchange="setResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s}, document.getElementById('${idA}').value, this.value)" />
+          ${marcadorSet}
         </div>
       `;
       if (set.puntosA != null && set.puntosB != null) {

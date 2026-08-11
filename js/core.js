@@ -77,6 +77,13 @@ let newTorneoData = null; // se inicializa en openNewTorneoModal()
 let showEditarTorneoModal = false;
 let editTorneoData = null; // se inicializa en openEditarTorneoModal()
 
+// Estado efímero (solo en este navegador, no se guarda en Firestore): qué
+// resultados se están editando ahora mismo. Un partido/set con resultado ya
+// guardado se muestra cerrado (marcador + botón editar) salvo que su
+// identificador esté aquí; uno sin resultado siempre se muestra editable.
+let partidosGrupoEnEdicion = new Set();
+let setsEliminatoriaEnEdicion = new Set(); // claves `${partidoId}:${setIndex}`
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
