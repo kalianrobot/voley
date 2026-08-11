@@ -134,11 +134,11 @@ function renderNewTorneoModal() {
 
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
-            <label>Puntos por set</label>
+            <label>Puntos por set (fase de grupos)</label>
             <input type="number" min="1" id="torneo-puntos-set" value="${d.puntosPorSet}" onchange="setTorneoPuntosPorSet(this.value)" />
           </div>
           <div class="labeled-field" style="flex:1;">
-            <label>Puntos máximo (tope)</label>
+            <label>Puntos máximo (fase de grupos)</label>
             <input type="number" min="1" id="torneo-puntos-maximo" value="${d.puntosMaximo}" onchange="setTorneoPuntosMaximo(this.value)" />
           </div>
         </div>
@@ -148,6 +148,18 @@ function renderNewTorneoModal() {
           <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
           <input type="number" min="1" step="2" id="torneo-num-sets" value="${d.numSets}" onchange="setTorneoNumSets(this.value)" />
         </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos por set (eliminatorias)</label>
+            <input type="number" min="1" id="torneo-puntos-set-elim" value="${d.puntosPorSetEliminatoria}" onchange="setTorneoPuntosPorSetEliminatoria(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos máximo (eliminatorias)</label>
+            <input type="number" min="1" id="torneo-puntos-maximo-elim" value="${d.puntosMaximoEliminatoria}" onchange="setTorneoPuntosMaximoEliminatoria(this.value)" />
+          </div>
+        </div>
+        <div class="competicion-nota">Igual que en fase de grupos pero con su propio tope, para poder jugar las eliminatorias a más puntos (p.ej. a 21 con tope 25).</div>
 
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
@@ -256,11 +268,11 @@ function renderEditarTorneoModal() {
 
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
-            <label>Puntos por set</label>
+            <label>Puntos por set (fase de grupos)</label>
             <input type="number" min="1" value="${d.puntosPorSet}" onchange="setEditTorneoPuntosPorSet(this.value)" />
           </div>
           <div class="labeled-field" style="flex:1;">
-            <label>Puntos máximo (tope)</label>
+            <label>Puntos máximo (fase de grupos)</label>
             <input type="number" min="1" value="${d.puntosMaximo}" onchange="setEditTorneoPuntosMaximo(this.value)" />
           </div>
         </div>
@@ -270,6 +282,18 @@ function renderEditarTorneoModal() {
           <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
           <input type="number" min="1" step="2" value="${d.numSets}" onchange="setEditTorneoNumSets(this.value)" />
         </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos por set (eliminatorias)</label>
+            <input type="number" min="1" value="${d.puntosPorSetEliminatoria}" onchange="setEditTorneoPuntosPorSetEliminatoria(this.value)" />
+          </div>
+          <div class="labeled-field" style="flex:1;">
+            <label>Puntos máximo (eliminatorias)</label>
+            <input type="number" min="1" value="${d.puntosMaximoEliminatoria}" onchange="setEditTorneoPuntosMaximoEliminatoria(this.value)" />
+          </div>
+        </div>
+        <div class="competicion-nota">Igual que en fase de grupos pero con su propio tope, para poder jugar las eliminatorias a más puntos (p.ej. a 21 con tope 25).</div>
 
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">

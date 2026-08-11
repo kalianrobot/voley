@@ -146,6 +146,10 @@ function emptyTorneo(datos) {
     fechaFin: datos.fechaFin,
     puntosPorSet: datos.puntosPorSet || PUNTOS_POR_SET_DEFAULT,
     puntosMaximo: datos.puntosMaximo || PUNTOS_MAXIMO_DEFAULT,
+    // Formato de las eliminatorias, independiente de la fase de grupos (p.ej.
+    // grupos a 15 con tope 21, eliminatorias a 21 con tope 25).
+    puntosPorSetEliminatoria: datos.puntosPorSetEliminatoria || PUNTOS_POR_SET_DEFAULT,
+    puntosMaximoEliminatoria: datos.puntosMaximoEliminatoria || PUNTOS_MAXIMO_DEFAULT,
     numSets: datos.numSets || NUM_SETS_DEFAULT,
     numCampos: datos.numCampos || NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: datos.duracionPartidoMin || DURACION_PARTIDO_DEFAULT,
