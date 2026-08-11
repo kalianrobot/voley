@@ -112,6 +112,8 @@ function openNewTorneoModal() {
     fechaFin: '',
     puntosPorSet: PUNTOS_POR_SET_DEFAULT,
     puntosMaximo: PUNTOS_MAXIMO_DEFAULT,
+    puntosPorSetEliminatoria: PUNTOS_POR_SET_DEFAULT,
+    puntosMaximoEliminatoria: PUNTOS_MAXIMO_DEFAULT,
     numSets: NUM_SETS_DEFAULT,
     numCampos: NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: DURACION_PARTIDO_DEFAULT,
@@ -191,6 +193,14 @@ function setTorneoPuntosMaximo(value) {
   newTorneoData.puntosMaximo = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
 }
 
+function setTorneoPuntosPorSetEliminatoria(value) {
+  newTorneoData.puntosPorSetEliminatoria = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
+}
+
+function setTorneoPuntosMaximoEliminatoria(value) {
+  newTorneoData.puntosMaximoEliminatoria = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
+}
+
 function setTorneoNumSets(value) {
   newTorneoData.numSets = Math.max(1, parseInt(value, 10) || NUM_SETS_DEFAULT);
 }
@@ -260,6 +270,8 @@ async function confirmNewTorneo() {
     fechaFin: d.fechaFin,
     puntosPorSet: d.puntosPorSet,
     puntosMaximo: d.puntosMaximo,
+    puntosPorSetEliminatoria: d.puntosPorSetEliminatoria,
+    puntosMaximoEliminatoria: d.puntosMaximoEliminatoria,
     numSets: d.numSets,
     numCampos: d.numCampos,
     duracionPartidoMin: d.duracionPartidoMin,

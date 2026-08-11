@@ -66,13 +66,17 @@ function validarCompeticion(comp) {
   return null;
 }
 
-// Valida el formato de puntuación compartido por fase de grupos y eliminatorias:
-// el tope debe estar por encima de los puntos por set (si no, el margen de 2 nunca
-// llegaría a decidir el set) y el número de sets debe ser impar para que siempre
-// haya un ganador claro.
+// Valida el formato de puntuación de fase de grupos y de eliminatorias (cada
+// una con su propio par puntos por set/tope, configurables por separado): el
+// tope debe estar por encima de los puntos por set (si no, el margen de 2
+// nunca llegaría a decidir el set) y el número de sets debe ser impar para
+// que siempre haya un ganador claro.
 function validarFormatoPartido(d) {
   if (!(d.puntosMaximo > d.puntosPorSet)) {
     return `El tope de puntos (${d.puntosMaximo}) debe ser mayor que los puntos por set (${d.puntosPorSet}).`;
+  }
+  if (!(d.puntosMaximoEliminatoria > d.puntosPorSetEliminatoria)) {
+    return `El tope de puntos de eliminatorias (${d.puntosMaximoEliminatoria}) debe ser mayor que sus puntos por set (${d.puntosPorSetEliminatoria}).`;
   }
   if (d.numSets % 2 === 0) {
     return `El número de sets debe ser impar (1, 3, 5...) para que siempre haya un ganador.`;

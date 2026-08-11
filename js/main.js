@@ -92,6 +92,16 @@ function sanitizeTorneo(t) {
     fechaFin: (t && typeof t.fechaFin === 'string') ? t.fechaFin : '',
     puntosPorSet: (t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT,
     puntosMaximo: (t && typeof t.puntosMaximo === 'number') ? t.puntosMaximo : PUNTOS_MAXIMO_DEFAULT,
+    // Si el torneo es de antes de que esto fuera configurable por separado,
+    // el fallback es el propio puntosPorSet/puntosMaximo del torneo (no la
+    // constante global), para no cambiarle el comportamiento a nadie que ya
+    // tuviera un torneo en marcha.
+    puntosPorSetEliminatoria: (t && typeof t.puntosPorSetEliminatoria === 'number')
+      ? t.puntosPorSetEliminatoria
+      : ((t && typeof t.puntosPorSet === 'number') ? t.puntosPorSet : PUNTOS_POR_SET_DEFAULT),
+    puntosMaximoEliminatoria: (t && typeof t.puntosMaximoEliminatoria === 'number')
+      ? t.puntosMaximoEliminatoria
+      : ((t && typeof t.puntosMaximo === 'number') ? t.puntosMaximo : PUNTOS_MAXIMO_DEFAULT),
     numSets,
     numCampos: (t && typeof t.numCampos === 'number') ? t.numCampos : NUM_CAMPOS_DEFAULT,
     duracionPartidoMin: (t && typeof t.duracionPartidoMin === 'number') ? t.duracionPartidoMin : DURACION_PARTIDO_DEFAULT,

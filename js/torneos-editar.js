@@ -12,6 +12,8 @@ function openEditarTorneoModal(torneoId) {
     fechaFin: torneo.fechaFin,
     puntosPorSet: torneo.puntosPorSet,
     puntosMaximo: torneo.puntosMaximo,
+    puntosPorSetEliminatoria: torneo.puntosPorSetEliminatoria,
+    puntosMaximoEliminatoria: torneo.puntosMaximoEliminatoria,
     numSets: torneo.numSets,
     numCampos: torneo.numCampos,
     duracionPartidoMin: torneo.duracionPartidoMin,
@@ -76,6 +78,14 @@ function setEditTorneoPuntosPorSet(value) {
 
 function setEditTorneoPuntosMaximo(value) {
   editTorneoData.puntosMaximo = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
+}
+
+function setEditTorneoPuntosPorSetEliminatoria(value) {
+  editTorneoData.puntosPorSetEliminatoria = Math.max(1, parseInt(value, 10) || PUNTOS_POR_SET_DEFAULT);
+}
+
+function setEditTorneoPuntosMaximoEliminatoria(value) {
+  editTorneoData.puntosMaximoEliminatoria = Math.max(1, parseInt(value, 10) || PUNTOS_MAXIMO_DEFAULT);
 }
 
 function setEditTorneoNumSets(value) {
@@ -147,7 +157,9 @@ async function confirmEditarTorneo() {
 
   const camposCompartidosNuevos = {
     nombre, fechaInicio: d.fechaInicio, fechaFin: d.fechaFin,
-    puntosPorSet: d.puntosPorSet, puntosMaximo: d.puntosMaximo, numSets: d.numSets,
+    puntosPorSet: d.puntosPorSet, puntosMaximo: d.puntosMaximo,
+    puntosPorSetEliminatoria: d.puntosPorSetEliminatoria, puntosMaximoEliminatoria: d.puntosMaximoEliminatoria,
+    numSets: d.numSets,
     numCampos: d.numCampos, duracionPartidoMin: d.duracionPartidoMin,
     comidaInicio: d.comidaInicio || null, comidaFin: d.comidaFin || null
   };

@@ -3,7 +3,7 @@
 // Campos que un torneo simultáneo comparte con sus hermanos de bloque (ver
 // torneosDelBloque): al editarlos hay que mantenerlos sincronizados, porque
 // programarPartidosBloque solo usa la configuración del primero del bloque.
-const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'puntosMaximo', 'numSets', 'numCampos', 'duracionPartidoMin', 'comidaInicio', 'comidaFin'];
+const CAMPOS_COMPARTIDOS_BLOQUE = ['nombre', 'fechaInicio', 'fechaFin', 'puntosPorSet', 'puntosMaximo', 'puntosPorSetEliminatoria', 'puntosMaximoEliminatoria', 'numSets', 'numCampos', 'duracionPartidoMin', 'comidaInicio', 'comidaFin'];
 
 function soloCamposCompartidos(t) {
   const campos = {};
@@ -193,8 +193,8 @@ function setResultadoSetEliminatoria(torneoId, partidoId, setIndex, puntosA, pun
   const a = (puntosA === '' || puntosA == null) ? null : Math.max(0, parseInt(puntosA, 10) || 0);
   const b = (puntosB === '' || puntosB == null) ? null : Math.max(0, parseInt(puntosB, 10) || 0);
   const torneo = getTorneo(torneoId);
-  if (torneo && !esResultadoValido(a, b, torneo.puntosPorSet, torneo.puntosMaximo)) {
-    alert(`Resultado no válido: hay que ganar el set por 2 puntos de diferencia a partir de ${torneo.puntosPorSet} (o llegar directamente a ${torneo.puntosMaximo}).`);
+  if (torneo && !esResultadoValido(a, b, torneo.puntosPorSetEliminatoria, torneo.puntosMaximoEliminatoria)) {
+    alert(`Resultado no válido: hay que ganar el set por 2 puntos de diferencia a partir de ${torneo.puntosPorSetEliminatoria} (o llegar directamente a ${torneo.puntosMaximoEliminatoria}).`);
     render();
     return;
   }
