@@ -9,6 +9,7 @@
   --line: rgba(31,42,46,0.10);
   --waiting: #B08642;
   --green: #2E7D32;
+  --sun: #F2A93B;
   --shadow-sm: 0 1px 2px rgba(14,59,64,0.06);
   --shadow-card: 0 1px 2px rgba(14,59,64,0.05), 0 14px 30px -18px rgba(14,59,64,0.35);
   --shadow-lift: 0 22px 48px -18px rgba(14,59,64,0.42);
@@ -20,10 +21,16 @@
 #app {
   font-family: 'Sora', system-ui, sans-serif;
   color: var(--ink);
-  background:
+  /* Grano muy sutil (SVG feTurbulence inline, sin imagen externa) sobre los
+     degradados de fondo: rompe la planitud del color sólido, como textura de
+     arena/papel. La opacidad va horneada en el propio SVG (rect opacity). */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
     radial-gradient(1100px 420px at 15% -10%, rgba(46,139,133,0.10), transparent 60%),
-    radial-gradient(900px 380px at 100% 0%, rgba(232,105,74,0.08), transparent 55%),
-    var(--sand);
+    radial-gradient(900px 380px at 100% 0%, rgba(232,105,74,0.08), transparent 55%);
+  background-repeat: repeat, no-repeat, no-repeat;
+  background-size: 140px 140px, auto, auto;
+  background-color: var(--sand);
   min-height: 100vh;
   padding: 0;
 }
@@ -38,7 +45,10 @@
 * { box-sizing: border-box; }
 
 .header {
+  /* Resplandor cálido (sol) abajo a la izquierda + el teal ya existente
+     arriba a la derecha: efecto atardecer sobre el mar. */
   background:
+    radial-gradient(460px 200px at 6% 115%, rgba(242,169,59,0.32), transparent 62%),
     radial-gradient(680px 260px at 88% -20%, rgba(46,139,133,0.55), transparent 60%),
     linear-gradient(135deg, var(--sea-deep), var(--sea));
   color: var(--paper);
@@ -145,6 +155,12 @@
 .add-red-btn:hover { background: var(--paper); border-color: rgba(27,94,99,0.4); box-shadow: var(--shadow-sm); }
 .add-red-btn:active { transform: scale(0.99); }
 
+/* A propósito, .red-card/.torneo-card/.grupo-card/.bracket-match no llevan
+   animación de entrada: render() reemplaza todo el #app en cada cambio de
+   estado (incluido cada resultado que se introduce durante un torneo en
+   directo), así que animarlas repetiría el efecto sin parar en vez de
+   sentirse como una aparición puntual. Las animaciones se reservan para
+   gestos puntuales del usuario (abrir un modal, pulsar un botón). */
 .red-card {
   background: var(--paper);
   border-radius: var(--radius-lg);
@@ -615,6 +631,15 @@
   color: var(--sea-deep);
 }
 
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalBoxIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -625,6 +650,7 @@
   justify-content: center;
   padding: 20px;
   z-index: 50;
+  animation: modalOverlayIn 0.15s ease-out;
 }
 
 .modal-box {
@@ -634,6 +660,7 @@
   max-width: 360px;
   width: 100%;
   box-shadow: var(--shadow-lift);
+  animation: modalBoxIn 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .modal-title {
@@ -721,7 +748,10 @@
   text-align: left;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+  transition: background 0.15s, transform 0.1s;
 }
+.historial-toggle:hover { background: var(--sand); }
+.historial-toggle:active { transform: scale(0.99); }
 
 .historial-list {
   margin-top: 8px;
@@ -800,7 +830,7 @@
   flex-shrink: 0;
 }
 .torneo-badge.upcoming { background: rgba(176,134,66,0.12); color: var(--waiting); }
-.torneo-badge.live { background: rgba(27,94,99,0.1); color: var(--sea); }
+.torneo-badge.live { background: rgba(242,169,59,0.2); color: #8A5115; }
 .torneo-badge.done { background: rgba(31,42,46,0.08); color: var(--ink); opacity: 0.6; }
 
 .delete-torneo {
