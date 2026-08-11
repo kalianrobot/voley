@@ -149,6 +149,27 @@ function setResultadoPartidoGrupo(torneoId, partidoId, puntosA, puntosB) {
   }));
 }
 
+// Reabre un partido de fase de grupos ya cerrado para poder corregir su
+// resultado (el botón ✏️ de renderPartidoGrupoRow).
+function editarResultadoPartidoGrupo(partidoId) {
+  partidosGrupoEnEdicion.add(partidoId);
+  render();
+}
+
+// Botón ✓ de renderPartidoGrupoRow: valida que los dos campos tengan algo
+// escrito (a diferencia de setResultadoPartidoGrupo, que tolera un resultado
+// a medias mientras se está escribiendo) y, si está bien, guarda y cierra.
+function confirmarResultadoPartidoGrupo(torneoId, partidoId) {
+  const valA = document.getElementById(`pg-a-${partidoId}`).value;
+  const valB = document.getElementById(`pg-b-${partidoId}`).value;
+  if (valA === '' || valB === '') {
+    alert('Debes indicar el resultado de los dos equipos.');
+    return;
+  }
+  setResultadoPartidoGrupo(torneoId, partidoId, valA, valB);
+  partidosGrupoEnEdicion.delete(partidoId);
+}
+
 function generarEliminatorias(torneoId) {
   const torneo = getTorneo(torneoId);
   if (!torneo || !puedeGenerarEliminatorias(torneo)) return;
@@ -216,6 +237,26 @@ function setResultadoSetEliminatoria(torneoId, partidoId, setIndex, puntosA, pun
     }
     return { ...prev, eliminatoria };
   });
+}
+
+// Reabre un set de eliminatorias ya cerrado para poder corregir su resultado
+// (el botón ✏️ de renderPartidoEliminatoria).
+function editarResultadoSetEliminatoria(partidoId, setIndex) {
+  setsEliminatoriaEnEdicion.add(`${partidoId}:${setIndex}`);
+  render();
+}
+
+// Botón ✓ de renderPartidoEliminatoria: igual que confirmarResultadoPartidoGrupo,
+// exige los dos campos rellenos antes de guardar y cerrar.
+function confirmarResultadoSetEliminatoria(torneoId, partidoId, setIndex) {
+  const valA = document.getElementById(`pe-${partidoId}-${setIndex}-a`).value;
+  const valB = document.getElementById(`pe-${partidoId}-${setIndex}-b`).value;
+  if (valA === '' || valB === '') {
+    alert('Debes indicar el resultado de los dos equipos.');
+    return;
+  }
+  setResultadoSetEliminatoria(torneoId, partidoId, setIndex, valA, valB);
+  setsEliminatoriaEnEdicion.delete(`${partidoId}:${setIndex}`);
 }
 
 function deleteTorneo(torneoId) {
