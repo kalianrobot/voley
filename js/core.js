@@ -275,6 +275,12 @@ async function runUpdate(updater, opts = {}) {
     return nuevo;
   } catch (e) {
     console.error('Error guardando en Firestore', e);
+    // Sin esto, un fallo de guardado pasaba inadvertido: la pantalla seguía
+    // mostrando el cambio optimista aunque nunca llegara a Firestore, y
+    // "desaparecía" en el siguiente sincronizado real (recarga, otro
+    // dispositivo...). Mejor avisar en el momento para poder reintentar.
+    alert('⚠️ No se ha podido guardar el cambio (revisa la conexión). Vuelve a intentarlo; si se repite, avisa al admin.');
+    return null;
   } finally {
     saving = false;
   }
@@ -380,10 +386,11 @@ async function confirmNewList() {
   if (!input || !input.value) return;
   const fecha = input.value;
   const yaExistia = !!state.listas[fecha];
-  await update(prev => {
+  const resultado = await update(prev => {
     if (prev.listas[fecha]) return prev; // ya existe, no pisar
     return { ...prev, listas: { ...prev.listas, [fecha]: emptyLista() } };
   });
+  if (!resultado) return; // el guardado falló (ya se ha avisado); no navegar a una lista que no se ha creado
   showNewListModal = false;
   openLista(fecha);
   if (!yaExistia) {

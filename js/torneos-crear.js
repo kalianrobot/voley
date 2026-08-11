@@ -199,11 +199,12 @@ async function confirmNewTorneo() {
     ordenBloque: i
   }));
 
-  await update(prev => {
+  const resultado = await update(prev => {
     const mapa = { ...prev.torneos };
     torneos.forEach(t => { mapa[t.id] = t; });
     return { ...prev, torneos: mapa };
   });
+  if (!resultado) return; // el guardado falló (ya se ha avisado); no navegar a un torneo que no se ha creado
   showNewTorneoModal = false;
   openTorneo(torneos[0].id);
 }
