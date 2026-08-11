@@ -1,4 +1,5 @@
-// Torneos: crear un torneo nuevo (modal y confirmación).
+// Torneos: primitivas de guardado (un documento Firestore por torneo, ver
+// torneoRef en core.js) y crear un torneo nuevo (modal y confirmación).
 
 /* ---------- Acciones sobre un torneo ---------- */
 
@@ -6,13 +7,86 @@ function getTorneo(id) {
   return state.torneos[id];
 }
 
-function updateTorneo(id, updater, opts) {
-  return update(prev => {
-    const actual = prev.torneos[id];
-    if (!actual) return prev;
-    const nuevo = typeof updater === 'function' ? updater(actual) : updater;
-    return { ...prev, torneos: { ...prev.torneos, [id]: nuevo } };
-  }, opts);
+// Lee, modifica y guarda un único torneo. updater recibe el torneo tal como
+// está en Firestore ahora mismo (no el de la caché local, por si otro
+// dispositivo lo cambió) y devuelve el torneo nuevo.
+async function updateTorneo(id, updater, opts = {}) {
+  savingTorneos = true;
+  const resultado = await guardarConAviso(async () => {
+    return await db.runTransaction(async (tx) => {
+      const ref = torneoRef(id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) return NO_ENCONTRADO; // alguien lo borró mientras tanto
+      const actual = sanitizeTorneo(JSON.parse(snap.data().data));
+      const nuevo = typeof updater === 'function' ? updater(actual) : updater;
+      tx.set(ref, { data: JSON.stringify(nuevo) });
+      return nuevo;
+    });
+  });
+  savingTorneos = false;
+  if (resultado && resultado !== NO_ENCONTRADO) {
+    state = { ...state, torneos: { ...state.torneos, [id]: resultado } };
+    if (opts.render !== false) render();
+  }
+  return resultado === NO_ENCONTRADO ? null : resultado;
+}
+
+// Igual que updateTorneo pero sobre varios torneos a la vez (p.ej. los que
+// juegan simultáneos en el mismo bloqueId), en una sola transacción atómica.
+// updater recibe un mapa {id: torneoActual} (solo los que existen) y debe
+// devolver un mapa {id: torneoNuevo|null}; null en un id significa borrarlo.
+async function updateTorneos(ids, updater) {
+  savingTorneos = true;
+  const resultado = await guardarConAviso(async () => {
+    return await db.runTransaction(async (tx) => {
+      const refs = {};
+      ids.forEach(id => { refs[id] = torneoRef(id); });
+      const actuales = {};
+      for (const id of ids) {
+        const snap = await tx.get(refs[id]);
+        if (snap.exists) actuales[id] = sanitizeTorneo(JSON.parse(snap.data().data));
+      }
+      const cambios = updater(actuales);
+      Object.keys(cambios).forEach(id => {
+        const ref = refs[id] || torneoRef(id);
+        if (cambios[id] == null) tx.delete(ref);
+        else tx.set(ref, { data: JSON.stringify(cambios[id]) });
+      });
+      return cambios;
+    });
+  });
+  savingTorneos = false;
+  if (resultado) {
+    const torneos = { ...state.torneos };
+    Object.keys(resultado).forEach(id => {
+      if (resultado[id] == null) delete torneos[id];
+      else torneos[id] = resultado[id];
+    });
+    state = { ...state, torneos };
+    render();
+  }
+  return resultado;
+}
+
+// Crea uno o varios torneos nuevos de una vez (el modo "dos torneos a la
+// vez" crea dos con el mismo bloqueId). Son documentos nuevos, así que basta
+// con un batch de escritura sin necesidad de leer nada antes.
+async function crearTorneos(torneos) {
+  savingTorneos = true;
+  const resultado = await guardarConAviso(async () => {
+    const batch = db.batch();
+    torneos.forEach(t => batch.set(torneoRef(t.id), { data: JSON.stringify(t) }));
+    await batch.commit();
+    return torneos;
+  });
+  savingTorneos = false;
+  if (resultado) {
+    const torneos = { ...state.torneos };
+    resultado.forEach(t => { torneos[t.id] = t; });
+    state = { ...state, torneos };
+    render();
+  }
+  return resultado;
 }
 
 function nuevaCompeticionBorrador(categoria) {
@@ -199,11 +273,7 @@ async function confirmNewTorneo() {
     ordenBloque: i
   }));
 
-  const resultado = await update(prev => {
-    const mapa = { ...prev.torneos };
-    torneos.forEach(t => { mapa[t.id] = t; });
-    return { ...prev, torneos: mapa };
-  });
+  const resultado = await crearTorneos(torneos);
   if (!resultado) return; // el guardado falló (ya se ha avisado); no navegar a un torneo que no se ha creado
   showNewTorneoModal = false;
   openTorneo(torneos[0].id);

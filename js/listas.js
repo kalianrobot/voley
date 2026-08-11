@@ -1,4 +1,6 @@
-// Listas del día: acciones sobre redes/jugadores/espera y permisos de gestión.
+// Listas del día: primitivas de guardado (un documento Firestore por lista,
+// ver listaRef en core.js), acciones sobre redes/jugadores/espera y
+// permisos de gestión.
 
 /* ---------- Acciones sobre una lista concreta ---------- */
 
@@ -6,12 +8,64 @@ function getLista(fecha) {
   return state.listas[fecha];
 }
 
-function updateLista(fecha, updater, opts) {
-  return update(prev => {
-    const actual = prev.listas[fecha] || emptyLista();
-    const nueva = typeof updater === 'function' ? updater(actual) : updater;
-    return { ...prev, listas: { ...prev.listas, [fecha]: nueva } };
-  }, opts);
+// Lee, modifica y guarda una única lista. Si el documento no existe todavía
+// se parte de una lista vacía (igual que antes), así que también sirve para
+// crear implícitamente listas que no pasaron por crearLista.
+async function updateLista(fecha, updater, opts = {}) {
+  savingListas = true;
+  const resultado = await guardarConAviso(async () => {
+    return await db.runTransaction(async (tx) => {
+      const ref = listaRef(fecha);
+      const snap = await tx.get(ref);
+      const actual = snap.exists ? sanitizeLista(JSON.parse(snap.data().data)) : emptyLista();
+      const nueva = typeof updater === 'function' ? updater(actual) : updater;
+      tx.set(ref, { data: JSON.stringify(nueva) });
+      return nueva;
+    });
+  });
+  savingListas = false;
+  if (resultado) {
+    state = { ...state, listas: { ...state.listas, [fecha]: resultado } };
+    if (opts.render !== false) render();
+  }
+  return resultado;
+}
+
+// Crea la lista de un día si no existía ya (no pisa una que ya tenga datos).
+async function crearLista(fecha) {
+  savingListas = true;
+  const resultado = await guardarConAviso(async () => {
+    return await db.runTransaction(async (tx) => {
+      const ref = listaRef(fecha);
+      const snap = await tx.get(ref);
+      if (snap.exists) return sanitizeLista(JSON.parse(snap.data().data)); // ya existe, no pisar
+      const nueva = emptyLista();
+      tx.set(ref, { data: JSON.stringify(nueva) });
+      return nueva;
+    });
+  });
+  savingListas = false;
+  if (resultado) {
+    state = { ...state, listas: { ...state.listas, [fecha]: resultado } };
+    render();
+  }
+  return resultado;
+}
+
+async function borrarListaDoc(fecha) {
+  savingListas = true;
+  const resultado = await guardarConAviso(async () => {
+    await listaRef(fecha).delete();
+    return true;
+  });
+  savingListas = false;
+  if (resultado) {
+    const listas = { ...state.listas };
+    delete listas[fecha];
+    state = { ...state, listas };
+    render();
+  }
+  return resultado;
 }
 
 function openNewRedModal(fecha) {
@@ -87,11 +141,7 @@ function deleteRed(fecha, id) {
 
 function deleteLista(fecha) {
   if (!confirm(`¿Borrar toda la lista del ${formatFechaLarga(fecha)}? Se perderá todo lo apuntado.`)) return;
-  update(prev => {
-    const listas = { ...prev.listas };
-    delete listas[fecha];
-    return { ...prev, listas };
-  });
+  borrarListaDoc(fecha);
   goToCalendar();
   showNotify(`🗑️ Se ha borrado la lista completa del ${formatFechaLarga(fecha)}.`);
 }

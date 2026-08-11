@@ -48,14 +48,16 @@ function ejecutarSorteo(torneoConDatos, bloqueBase) {
     porTorneoConArbitros[t.id] = asignarArbitros(t.equipos, porTorneo[t.id]);
   });
 
-  update(prev => {
-    const torneos = { ...prev.torneos };
+  const ids = bloque.map(t => t.id);
+  updateTorneos(ids, actuales => {
+    const cambios = {};
     bloque.forEach(t => {
       const id = t.id;
-      if (!torneos[id]) return;
+      const actual = actuales[id];
+      if (!actual) return;
       if (id === torneoConDatos.id) {
-        torneos[id] = {
-          ...torneos[id],
+        cambios[id] = {
+          ...actual,
           ...soloCamposCompartidos(torneoConDatos),
           equipos: torneoConDatos.equipos,
           numGrupos: torneoConDatos.numGrupos,
@@ -65,13 +67,13 @@ function ejecutarSorteo(torneoConDatos, bloqueBase) {
           partidosGrupo: porTorneoConArbitros[id],
           sorteoConfirmado: false,
           eliminatoria: null,
-          historial: agregarHistorial(torneos[id].historial, `🎲 Sorteo de grupos realizado (${numGrupos} grupos)`)
+          historial: agregarHistorial(actual.historial, `🎲 Sorteo de grupos realizado (${numGrupos} grupos)`)
         };
       } else {
-        torneos[id] = { ...torneos[id], ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[id] };
+        cambios[id] = { ...actual, ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[id] };
       }
     });
-    return { ...prev, torneos };
+    return cambios;
   });
 }
 
@@ -96,13 +98,15 @@ function reprogramarBloque(bloqueActualizado) {
   bloqueActualizado.forEach(t => {
     porTorneoConArbitros[t.id] = asignarArbitros(t.equipos, porTorneo[t.id]);
   });
-  update(prev => {
-    const torneos = { ...prev.torneos };
+  const ids = bloqueActualizado.map(t => t.id);
+  updateTorneos(ids, actuales => {
+    const cambios = {};
     bloqueActualizado.forEach(t => {
-      if (!torneos[t.id]) return;
-      torneos[t.id] = { ...torneos[t.id], ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[t.id] };
+      const actual = actuales[t.id];
+      if (!actual) return;
+      cambios[t.id] = { ...actual, ...soloCamposCompartidos(t), partidosGrupo: porTorneoConArbitros[t.id] };
     });
-    return { ...prev, torneos };
+    return cambios;
   });
 }
 
@@ -110,20 +114,22 @@ function reprogramarBloque(bloqueActualizado) {
 // todos sus torneos, y los campos propios (incluido un posible renombrado de equipos
 // ya aplicado a torneoPropioActualizado) solo en el torneo editado.
 function guardarCambiosSinResortear(torneoId, torneoPropioActualizado, bloqueActualizado) {
-  update(prev => {
-    const torneos = { ...prev.torneos };
+  const ids = bloqueActualizado.map(t => t.id);
+  updateTorneos(ids, actuales => {
+    const cambios = {};
     bloqueActualizado.forEach(t => {
-      if (!torneos[t.id]) return;
+      const actual = actuales[t.id];
+      if (!actual) return;
       if (t.id === torneoId) {
-        torneos[t.id] = {
+        cambios[t.id] = {
           ...torneoPropioActualizado,
           ...soloCamposCompartidos(t)
         };
       } else {
-        torneos[t.id] = { ...torneos[t.id], ...soloCamposCompartidos(t) };
+        cambios[t.id] = { ...actual, ...soloCamposCompartidos(t) };
       }
     });
-    return { ...prev, torneos };
+    return cambios;
   });
 }
 
@@ -235,14 +241,14 @@ function deleteTorneo(torneoId) {
     superviviente = { ...solo, partidosGrupo: asignarArbitros(solo.equipos, porTorneo[solo.id]) };
   }
 
-  update(prev => {
-    const torneos = { ...prev.torneos };
-    delete torneos[torneoId];
-    if (superviviente && torneos[superviviente.id]) torneos[superviviente.id] = superviviente;
-    return { ...prev, torneos };
+  const ids = superviviente ? [torneoId, superviviente.id] : [torneoId];
+  updateTorneos(ids, actuales => {
+    const cambios = { [torneoId]: null };
+    if (superviviente && actuales[superviviente.id]) cambios[superviviente.id] = superviviente;
+    return cambios;
   });
   // Si se borra desde su propia vista hay que volver al calendario; si se borra
-  // desde la tarjeta del calendario, update() ya vuelve a renderizar sin tocar el mes que se estaba viendo.
+  // desde la tarjeta del calendario, updateTorneos() ya vuelve a renderizar sin tocar el mes que se estaba viendo.
   if (estabaViendolo) goToCalendar();
 }
 
