@@ -142,54 +142,126 @@ function getFechaFromUrl() {
   return null;
 }
 
+// Consulta de rango que enumera todos los documentos de 'volea' cuyo ID
+// empieza por `prefijo` (torneo-, dia-). Truco estándar de Firestore para
+// simular "empieza por": '' es un carácter muy alto en el orden
+// lexicográfico, así que sirve de límite superior.
+function rangoPrefijo(prefijo) {
+  return DOC_REF.parent
+    .where(firebase.firestore.FieldPath.documentId(), '>=', prefijo)
+    .where(firebase.firestore.FieldPath.documentId(), '<', prefijo + '\uf8ff');
+}
+
+// Migración de una sola vez: si todavía no hay ningún documento torneo-*/
+// dia-*, reparte el contenido del documento histórico volea/lista-actual en
+// un documento por torneo y por lista. lista-actual no se borra ni se
+// modifica en ningún caso: queda como copia de seguridad permanente de todo
+// lo anterior a este cambio. La escritura es un único batch atómico (todo o
+// nada), así que "hay algún documento migrado" es una señal fiable de
+// "migración completa" sin necesitar un documento marca aparte.
+async function migrarSiHaceFalta() {
+  const [torneosSnap, diasSnap] = await Promise.all([
+    rangoPrefijo(PREFIJO_TORNEO).limit(1).get(),
+    rangoPrefijo(PREFIJO_DIA).limit(1).get()
+  ]);
+  if (!torneosSnap.empty || !diasSnap.empty) return; // ya migrado
+
+  const viejoSnap = await DOC_REF.get();
+  if (!viejoSnap.exists) return; // no había nada que migrar
+
+  let viejo;
+  try {
+    viejo = sanitizeState(JSON.parse(viejoSnap.data().data));
+  } catch (e) {
+    console.error('Error leyendo el documento antiguo para migrar', e);
+    return;
+  }
+
+  const entradas = [
+    ...Object.keys(viejo.torneos).map(id => ({ ref: torneoRef(id), datos: viejo.torneos[id] })),
+    ...Object.keys(viejo.listas).map(fecha => ({ ref: listaRef(fecha), datos: viejo.listas[fecha] }))
+  ];
+  if (entradas.length === 0) return;
+
+  if (entradas.length > 500) {
+    // Límite de un batch de Firestore: mejor no migrar nada que migrar a
+    // medias. Muy improbable a la escala de este club.
+    console.error(`Migración abortada: ${entradas.length} documentos superan el límite de un batch atómico.`);
+    alert('⚠️ No se ha podido migrar la base de datos automáticamente (demasiados torneos/listas). Avisa para revisarlo a mano.');
+    return;
+  }
+
+  const batch = db.batch();
+  entradas.forEach(e => batch.set(e.ref, { data: JSON.stringify(e.datos) }));
+  await batch.commit();
+  console.log(`Migración completada: ${entradas.length} documentos creados a partir de ${DOC_REF.path}.`);
+}
+
+// Engancha un listener en tiempo real sobre todos los documentos con el
+// prefijo dado y mantiene state[clave] al día. estaGuardando/marcarListo
+// distinguen guardados propios en curso (para no pisar el cambio optimista)
+// de la primera carga (para saber cuándo dejar de mostrar "Cargando…").
+function escucharPorPrefijo(clave, prefijo, sanear, estaGuardando, marcarListo, comprobarPrimeraCarga) {
+  rangoPrefijo(prefijo).onSnapshot(
+    snap => {
+      if (estaGuardando()) { marcarListo(); comprobarPrimeraCarga(); return; }
+
+      const mapa = {};
+      snap.forEach(doc => {
+        const id = doc.id.slice(prefijo.length);
+        try {
+          mapa[id] = sanear(JSON.parse(doc.data().data));
+        } catch (e) {
+          console.error(`Error parseando ${clave}`, doc.id, e);
+        }
+      });
+
+      if (!loading) {
+        const activeFocus = document.activeElement;
+        const isTyping = activeFocus && activeFocus.tagName === 'INPUT';
+        if (isTyping) return;
+        if (JSON.stringify(state[clave]) === JSON.stringify(mapa)) return;
+      }
+
+      state = { ...(state || emptyState()), [clave]: mapa };
+      marcarListo();
+      if (loading) comprobarPrimeraCarga(); else render();
+    },
+    err => {
+      console.error(`Error escuchando ${clave}`, err);
+      marcarListo();
+      comprobarPrimeraCarga();
+    }
+  );
+}
+
+function engancharListeners() {
+  let torneosListos = false;
+  let diasListos = false;
+
+  function comprobarPrimeraCarga() {
+    if (!loading || !torneosListos || !diasListos) return;
+    loading = false;
+    const fechaUrl = getFechaFromUrl();
+    if (fechaUrl && state.listas[fechaUrl]) {
+      view = { screen: 'list', fecha: fechaUrl };
+    }
+    render();
+  }
+
+  escucharPorPrefijo('torneos', PREFIJO_TORNEO, sanitizeTorneo, () => savingTorneos, () => { torneosListos = true; }, comprobarPrimeraCarga);
+  escucharPorPrefijo('listas', PREFIJO_DIA, sanitizeLista, () => savingListas, () => { diasListos = true; }, comprobarPrimeraCarga);
+}
+
 function init() {
   loading = true;
   const today = new Date();
   view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
   render();
 
-  DOC_REF.onSnapshot(
-    (snap) => {
-      if (saving) return;
-      let remote = emptyState();
-      if (snap.exists) {
-        const data = snap.data();
-        try {
-          remote = sanitizeState(JSON.parse(data.data));
-        } catch (e) {
-          console.error('Error parseando datos de Firestore', e);
-          remote = emptyState();
-        }
-      }
-
-      const activeFocus = document.activeElement;
-      const isTyping = activeFocus && activeFocus.tagName === 'INPUT';
-
-      if (loading) {
-        state = remote;
-        loading = false;
-        const fechaUrl = getFechaFromUrl();
-        if (fechaUrl && state.listas[fechaUrl]) {
-          view = { screen: 'list', fecha: fechaUrl };
-        }
-        render();
-        return;
-      }
-
-      if (isTyping) return;
-      if (JSON.stringify(state) === JSON.stringify(remote)) return;
-      state = remote;
-      render();
-    },
-    (err) => {
-      console.error('Error escuchando Firestore', err);
-      if (loading) {
-        state = emptyState();
-        loading = false;
-        render();
-      }
-    }
-  );
+  migrarSiHaceFalta()
+    .catch(err => console.error('Error migrando a documentos por entidad', err))
+    .finally(() => engancharListeners());
 }
 
 init();

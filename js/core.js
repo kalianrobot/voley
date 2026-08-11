@@ -12,7 +12,23 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+// Documento histórico: todo el estado en un único blob JSON. Se deja de
+// escribir en cuanto arranca la migración a documentos por entidad (ver
+// migrarSiHaceFalta en main.js), pero se conserva para siempre como copia
+// de seguridad de todo lo anterior — nunca se borra ni se sobreescribe.
 const DOC_REF = db.collection('volea').doc('lista-actual');
+
+// A partir de aquí cada torneo y cada lista de un día vive en su propio
+// documento dentro de la misma colección 'volea' (las reglas de seguridad
+// de Firestore solo cubren volea/{docId}, un único segmento de ruta, así
+// que no sirven colecciones nuevas ni subcolecciones). El prefijo 'dia-' se
+// eligió para las listas, no 'lista-', porque 'lista-actual' también
+// empieza por 'lista-' y colisionaría con la consulta de rango por prefijo
+// que enumera todas las listas (ver PREFIJO_DIA en main.js).
+const PREFIJO_TORNEO = 'torneo-';
+const PREFIJO_DIA = 'dia-';
+function torneoRef(id) { return DOC_REF.parent.doc(PREFIJO_TORNEO + id); }
+function listaRef(fecha) { return DOC_REF.parent.doc(PREFIJO_DIA + fecha); }
 
 const MAX_PER_RED = 6;
 const MAX_PER_RED_EXTRA = 4;
@@ -42,7 +58,12 @@ const DURACION_PARTIDO_DEFAULT = 20;
 
 let state = null;        // { listas: { 'YYYY-MM-DD': { lugar, redes } }, torneos: { id: Torneo } }
 let loading = true;
-let saving = false;
+// Un flag por tipo de entidad (en vez de uno global): al escribir solo se
+// toca el documento de ese torneo o esa lista, así que un guardado en un
+// torneo ya no tiene por qué bloquear la sincronización de las listas (ni
+// viceversa).
+let savingTorneos = false;
+let savingListas = false;
 
 // vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha } o { screen: 'torneo', torneoId }
 let view = { screen: 'calendar', calYear: null, calMonth: null };
@@ -253,36 +274,22 @@ function nombreTorneo(torneo) {
   return torneo.bloqueId ? `${torneo.nombre} · ${capitalizar(torneo.categoria)}` : torneo.nombre;
 }
 
-async function runUpdate(updater, opts = {}) {
-  saving = true;
+// Símbolo distinto de null/undefined para poder devolver "no había nada que
+// actualizar" (p.ej. alguien más borró ese torneo) sin que se confunda con
+// un fallo real de guardado.
+const NO_ENCONTRADO = Symbol('no-encontrado');
+
+// Envuelve cualquier operación contra Firestore para que, si falla, se
+// avise al momento en vez de perder el cambio en silencio (ver PR #31: un
+// torneo "desaparecía" un día después porque el guardado había fallado sin
+// que nadie se enterara). Todos los helpers de más abajo pasan por aquí.
+async function guardarConAviso(fn) {
   try {
-    const nuevo = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(DOC_REF);
-      let remote = emptyState();
-      if (snap.exists) {
-        try {
-          remote = sanitizeState(JSON.parse(snap.data().data));
-        } catch (e) {
-          remote = emptyState();
-        }
-      }
-      const resultado = typeof updater === 'function' ? updater(remote) : updater;
-      tx.set(DOC_REF, { data: JSON.stringify(resultado) });
-      return resultado;
-    });
-    state = nuevo;
-    if (opts.render !== false) render();
-    return nuevo;
+    return await fn();
   } catch (e) {
     console.error('Error guardando en Firestore', e);
-    // Sin esto, un fallo de guardado pasaba inadvertido: la pantalla seguía
-    // mostrando el cambio optimista aunque nunca llegara a Firestore, y
-    // "desaparecía" en el siguiente sincronizado real (recarga, otro
-    // dispositivo...). Mejor avisar en el momento para poder reintentar.
     alert('⚠️ No se ha podido guardar el cambio (revisa la conexión). Vuelve a intentarlo; si se repite, avisa al admin.');
     return null;
-  } finally {
-    saving = false;
   }
 }
 
@@ -290,10 +297,6 @@ function esc(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : String(str);
   return div.innerHTML;
-}
-
-function update(updater, opts) {
-  return runUpdate(updater, opts);
 }
 
 /* ---------- Aviso de WhatsApp ---------- */
@@ -386,10 +389,7 @@ async function confirmNewList() {
   if (!input || !input.value) return;
   const fecha = input.value;
   const yaExistia = !!state.listas[fecha];
-  const resultado = await update(prev => {
-    if (prev.listas[fecha]) return prev; // ya existe, no pisar
-    return { ...prev, listas: { ...prev.listas, [fecha]: emptyLista() } };
-  });
+  const resultado = await crearLista(fecha); // crearLista no pisa si ya existía
   if (!resultado) return; // el guardado falló (ya se ha avisado); no navegar a una lista que no se ha creado
   showNewListModal = false;
   openLista(fecha);
