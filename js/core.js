@@ -47,7 +47,7 @@ function urlParaFecha(fecha) {
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
-const CATEGORIAS_TORNEO = ['masculino', 'femenino', 'mixto'];
+const CATEGORIAS_TORNEO = ['masculino', 'femenino', 'mixto', 'género libre'];
 const PUNTOS_POR_SET_DEFAULT = 15;
 // Tope de puntos: al llegarlo se gana el set aunque la ventaja sea de un solo punto,
 // para que no se alargue indefinidamente esperando los 2 puntos de diferencia.
