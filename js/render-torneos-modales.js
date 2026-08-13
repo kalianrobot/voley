@@ -100,7 +100,7 @@ function renderNewTorneoModal() {
     .join('');
 
   return `
-    <div class="modal-overlay" onclick="if(event.target===this) closeNewTorneoModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width: 420px; max-height: 88vh; overflow-y: auto;">
         <h3 class="modal-title">${dos ? 'Dos torneos a la vez' : 'Nuevo torneo'}</h3>
 
