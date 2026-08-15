@@ -114,6 +114,12 @@ const DEVICE_ID = getDeviceId();
 // ajena al grupo; no es seguridad real. Cámbialo por el que quieras.
 const ADMIN_PIN = '2222';
 
+// Ruta que hay que teclear para que la app cargue de verdad (ver rutaValida()
+// en main.js). Igual que el PIN de arriba: al ser una web estática el código
+// (y por tanto esta ruta) es visible para quien mire el código fuente, así
+// que solo evita llegar por casualidad o adivinando, no es seguridad real.
+const RUTA_SECRETA = '/karma';
+
 function isAdminStored() {
   try {
     return localStorage.getItem('voley_admin') === '1';

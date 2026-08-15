@@ -279,7 +279,17 @@ function engancharListeners() {
   escucharPorPrefijo('listas', PREFIJO_DIA, sanitizeLista, () => savingListas, () => { diasListos = true; }, comprobarPrimeraCarga);
 }
 
+// Solo se arranca la app (y se conecta a Firestore) si la URL lleva la ruta
+// secreta (ver RUTA_SECRETA en core.js); cualquier otra ruta, incluida la
+// raíz, se queda en blanco.
+function rutaValida() {
+  const path = window.location.pathname.replace(/\/+$/, '');
+  return path === RUTA_SECRETA;
+}
+
 function init() {
+  if (!rutaValida()) return;
+
   loading = true;
   const today = new Date();
   view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
