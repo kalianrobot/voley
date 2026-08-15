@@ -152,6 +152,18 @@ function getFechaFromUrl() {
   return null;
 }
 
+// Permite compartir el enlace de un torneo concreto (para gente externa al
+// grupo que no tiene por qué ver las listas de partidos diarios) con
+// ?torneo=<id>: entra directo a su vista sin pasar por el calendario.
+function getTorneoIdFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('torneo') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Consulta de rango que enumera todos los documentos de 'volea' cuyo ID
 // empieza por `prefijo` (torneo-, dia-). Truco estándar de Firestore para
 // simular "empieza por": '' es un carácter muy alto en el orden
@@ -252,8 +264,11 @@ function engancharListeners() {
   function comprobarPrimeraCarga() {
     if (!loading || !torneosListos || !diasListos) return;
     loading = false;
+    const torneoUrl = getTorneoIdFromUrl();
     const fechaUrl = getFechaFromUrl();
-    if (fechaUrl && state.listas[fechaUrl]) {
+    if (torneoUrl && state.torneos[torneoUrl]) {
+      view = { screen: 'torneo', torneoId: torneoUrl };
+    } else if (fechaUrl && state.listas[fechaUrl]) {
       view = { screen: 'list', fecha: fechaUrl };
     }
     render();

@@ -31,6 +31,7 @@ function renderTorneoView() {
     </div>
 
     <div class="main">
+      <button class="back-btn" style="background:rgba(27,94,99,0.1); border-color:rgba(27,94,99,0.3); color:var(--sea-deep); margin-bottom:16px;" onclick="copiarEnlaceTorneo('${torneo.id}')">🔗 Copiar enlace del torneo</button>
       ${renderTorneoEquiposYGrupos(torneo)}
       ${torneo.grupos ? renderEliminatoriasSection(torneo) : ''}
       ${puedeGestionarTorneo(torneo) ? `
