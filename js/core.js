@@ -67,11 +67,12 @@ let savingListas = false;
 
 // vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha } o { screen: 'torneo', torneoId }
 let view = { screen: 'calendar', calYear: null, calMonth: null };
-// true si se ha entrado directamente con ?torneo=<id> (ver getTorneoIdFromUrl en
+// true si se ha entrado directamente con /t/<id> (ver getRutaTorneoId en
 // main.js): oculta el botón de volver al calendario para que quien reciba el
 // enlace de un torneo no acabe viendo el calendario ni las listas de partidos
-// diarios. Se queda a true el resto de la sesión aunque luego se navegue entre
-// torneos simultáneos con el selector de bloque.
+// diarios, y evita conectar con las listas por Firestore. Se queda a true el
+// resto de la sesión aunque luego se navegue entre torneos simultáneos con
+// el selector de bloque.
 let entradaPorEnlaceTorneo = false;
 let showNewListModal = false;
 let showNewRedModal = false;
@@ -361,11 +362,13 @@ function copyAndOpenWhatsapp() {
   render();
 }
 
-// Enlace directo a este torneo (ver openTorneo/getTorneoIdFromUrl): quien lo
-// abra entra sin pasar por el calendario ni las listas de partidos diarios,
-// pensado para compartir con gente externa al grupo.
+// Enlace directo a este torneo (ver getRutaTorneoId() en main.js): usa su
+// propia ruta /t/<id>, NUNCA la ruta secreta actual (window.location.pathname
+// podría ser RUTA_SECRETA si quien copia está navegando dentro de la app) -
+// si no, el enlace compartido con gente externa se llevaría el secreto por
+// delante y bastaría con borrar el "?..." para llegar al calendario.
 function copiarEnlaceTorneo(torneoId) {
-  const url = `${window.location.origin}${window.location.pathname}?torneo=${encodeURIComponent(torneoId)}`;
+  const url = `${window.location.origin}/t/${encodeURIComponent(torneoId)}`;
   copiarAlPortapapeles(url);
   alert('Enlace del torneo copiado:\n' + url);
 }
@@ -385,12 +388,17 @@ function openLista(fecha) {
   render();
 }
 
-// Deja el id del torneo en la URL para que, si alguien copia el enlace del
-// navegador (o usa el botón "Copiar enlace"), quien lo abra entre directo a
-// este torneo sin pasar por el calendario ni ver las listas de partidos diarios.
+// Navegación dentro de la app: si ya se entró por el enlace directo de un
+// torneo (/t/<id>, ver getRutaTorneoId en main.js), el selector de bloque
+// puede saltar al torneo hermano sin volver a exponer la ruta secreta -
+// se mantiene en /t/<id>. Si no, es navegación interna normal bajo la ruta
+// secreta y se queda como estaba (?torneo=<id> sobre la ruta actual).
 function openTorneo(torneoId) {
   view = { screen: 'torneo', torneoId };
-  try { history.replaceState(null, '', '?torneo=' + encodeURIComponent(torneoId)); } catch (e) {}
+  try {
+    const destino = entradaPorEnlaceTorneo ? ('/t/' + encodeURIComponent(torneoId)) : ('?torneo=' + encodeURIComponent(torneoId));
+    history.replaceState(null, '', destino);
+  } catch (e) {}
   render();
 }
 
