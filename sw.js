@@ -5,7 +5,7 @@
 // cualquier llamada a Firestore van siempre a la red: aquí no se cachea nada
 // que dependa de la ruta ni de datos en vivo, así que no interfiere con
 // RUTA_SECRETA/rutaValida() ni sirve nunca datos desactualizados del torneo.
-const CACHE = 'volea-static-v5';
+const CACHE = 'volea-static-v6';
 const ASSETS = [
   'styles.css',
   'js/core.js',
