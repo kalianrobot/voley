@@ -2,10 +2,12 @@
 
 function renderTorneoView() {
   const torneo = getTorneo(view.torneoId);
+  const botonCalendario = entradaPorEnlaceTorneo ? '' : `<button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>`;
+
   if (!torneo) {
     return `
       <div class="main">
-        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        ${botonCalendario}
         <div class="empty-state">
           <div class="big">Este torneo ya no existe</div>
         </div>
@@ -16,7 +18,7 @@ function renderTorneoView() {
   return `
     <div class="header">
       <div class="header-inner">
-        <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
+        ${botonCalendario}
         <div class="eyebrow">Volea Beach Forever 🏝️ · Torneo</div>
         <div class="list-date-label">${formatRangoFechasTorneo(torneo)}</div>
         <div class="title-row">
