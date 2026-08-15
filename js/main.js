@@ -152,9 +152,10 @@ function getFechaFromUrl() {
   return null;
 }
 
-// Permite compartir el enlace de un torneo concreto (para gente externa al
-// grupo que no tiene por qué ver las listas de partidos diarios) con
-// ?torneo=<id>: entra directo a su vista sin pasar por el calendario.
+// Deep-link de conveniencia SOLO para navegación interna bajo la ruta secreta
+// (RUTA_SECRETA/?torneo=<id>): no oculta el calendario ni las listas, así que
+// no vale para compartir con gente externa (para eso, /t/<id> - ver
+// getRutaTorneoId más abajo).
 function getTorneoIdFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -162,6 +163,34 @@ function getTorneoIdFromUrl() {
   } catch (e) {
     return null;
   }
+}
+
+// El enlace pensado para compartir con gente externa a un torneo concreto:
+// /t/<id>, con ruta propia en vez de colgar de RUTA_SECRETA (ver
+// copiarEnlaceTorneo en core.js), así que copiarlo o abrirlo nunca revela la
+// ruta secreta de la app.
+function getRutaTorneoId() {
+  const path = window.location.pathname.replace(/\/+$/, '');
+  const m = path.match(/^\/t\/([^/]+)$/);
+  return m ? m[1] : null;
+}
+
+function rutaValida() {
+  const path = window.location.pathname.replace(/\/+$/, '');
+  return path === RUTA_SECRETA || !!getRutaTorneoId();
+}
+
+// Página señuelo para cualquier ruta que no sea válida (incluida la raíz):
+// imita un 404 genérico de servidor, sin nada de la app cargado.
+function renderRutaInvalida() {
+  document.getElementById('app').innerHTML = `
+    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#fff; font-family:Arial, Helvetica, sans-serif;">
+      <div style="text-align:center; color:#333;">
+        <h1 style="font-size:20px; font-weight:normal; border-bottom:1px solid #ccc; padding-bottom:10px; margin:0 0 10px;">404 Not Found</h1>
+        <p style="font-size:14px; color:#888; margin:0;">The requested URL was not found on this server.</p>
+      </div>
+    </div>
+  `;
 }
 
 // Consulta de rango que enumera todos los documentos de 'volea' cuyo ID
@@ -257,38 +286,42 @@ function escucharPorPrefijo(clave, prefijo, sanear, estaGuardando, marcarListo, 
   );
 }
 
+// Un enlace directo de torneo (/t/<id>) no necesita las listas de partidos
+// diarios para nada, así que en ese caso ni se conecta a esa colección de
+// Firestore: menos datos descargados y ninguna razón para que un visitante
+// externo llegue a tener esa información en el navegador.
 function engancharListeners() {
+  const soloTorneoExterno = !!getRutaTorneoId();
   let torneosListos = false;
-  let diasListos = false;
+  let diasListos = soloTorneoExterno;
 
   function comprobarPrimeraCarga() {
     if (!loading || !torneosListos || !diasListos) return;
     loading = false;
-    const torneoUrl = getTorneoIdFromUrl();
-    const fechaUrl = getFechaFromUrl();
-    if (torneoUrl && state.torneos[torneoUrl]) {
-      view = { screen: 'torneo', torneoId: torneoUrl };
+    const torneoRuta = getRutaTorneoId();
+    if (torneoRuta) {
+      view = { screen: 'torneo', torneoId: torneoRuta };
       entradaPorEnlaceTorneo = true;
-    } else if (fechaUrl && state.listas[fechaUrl]) {
-      view = { screen: 'list', fecha: fechaUrl };
+    } else {
+      const torneoUrl = getTorneoIdFromUrl();
+      const fechaUrl = getFechaFromUrl();
+      if (torneoUrl && state.torneos[torneoUrl]) {
+        view = { screen: 'torneo', torneoId: torneoUrl };
+      } else if (fechaUrl && state.listas[fechaUrl]) {
+        view = { screen: 'list', fecha: fechaUrl };
+      }
     }
     render();
   }
 
   escucharPorPrefijo('torneos', PREFIJO_TORNEO, sanitizeTorneo, () => savingTorneos, () => { torneosListos = true; }, comprobarPrimeraCarga);
-  escucharPorPrefijo('listas', PREFIJO_DIA, sanitizeLista, () => savingListas, () => { diasListos = true; }, comprobarPrimeraCarga);
-}
-
-// Solo se arranca la app (y se conecta a Firestore) si la URL lleva la ruta
-// secreta (ver RUTA_SECRETA en core.js); cualquier otra ruta, incluida la
-// raíz, se queda en blanco.
-function rutaValida() {
-  const path = window.location.pathname.replace(/\/+$/, '');
-  return path === RUTA_SECRETA;
+  if (!soloTorneoExterno) {
+    escucharPorPrefijo('listas', PREFIJO_DIA, sanitizeLista, () => savingListas, () => { diasListos = true; }, comprobarPrimeraCarga);
+  }
 }
 
 function init() {
-  if (!rutaValida()) return;
+  if (!rutaValida()) { renderRutaInvalida(); return; }
 
   loading = true;
   const today = new Date();
