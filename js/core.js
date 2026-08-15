@@ -322,9 +322,7 @@ function closeNotify() {
   render();
 }
 
-function copyAndOpenWhatsapp() {
-  if (!notifyMessage) return;
-  const texto = notifyMessage;
+function copiarAlPortapapeles(texto) {
   const fallbackCopy = () => {
     const textarea = document.createElement('textarea');
     textarea.value = texto;
@@ -340,9 +338,24 @@ function copyAndOpenWhatsapp() {
   } else {
     fallbackCopy();
   }
+}
+
+function copyAndOpenWhatsapp() {
+  if (!notifyMessage) return;
+  const texto = notifyMessage;
+  copiarAlPortapapeles(texto);
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
   notifyMessage = null;
   render();
+}
+
+// Enlace directo a este torneo (ver openTorneo/getTorneoIdFromUrl): quien lo
+// abra entra sin pasar por el calendario ni las listas de partidos diarios,
+// pensado para compartir con gente externa al grupo.
+function copiarEnlaceTorneo(torneoId) {
+  const url = `${window.location.origin}${window.location.pathname}?torneo=${encodeURIComponent(torneoId)}`;
+  copiarAlPortapapeles(url);
+  alert('Enlace del torneo copiado:\n' + url);
 }
 
 /* ---------- Navegacion ---------- */
@@ -350,6 +363,7 @@ function copyAndOpenWhatsapp() {
 function goToCalendar() {
   const today = new Date();
   view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
+  try { history.replaceState(null, '', window.location.pathname); } catch (e) {}
   render();
 }
 
@@ -359,8 +373,12 @@ function openLista(fecha) {
   render();
 }
 
+// Deja el id del torneo en la URL para que, si alguien copia el enlace del
+// navegador (o usa el botón "Copiar enlace"), quien lo abra entre directo a
+// este torneo sin pasar por el calendario ni ver las listas de partidos diarios.
 function openTorneo(torneoId) {
   view = { screen: 'torneo', torneoId };
+  try { history.replaceState(null, '', '?torneo=' + encodeURIComponent(torneoId)); } catch (e) {}
   render();
 }
 
