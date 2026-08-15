@@ -323,6 +323,13 @@ function engancharListeners() {
 function init() {
   if (!rutaValida()) { renderRutaInvalida(); return; }
 
+  // Solo cachea archivos estáticos (ver sw.js); no afecta a datos en vivo ni
+  // a qué ruta se considera válida. Se registra aquí, no en la página
+  // señuelo, para que esta no descargue ni instale nada de la app.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.error('Error registrando el service worker', err));
+  }
+
   loading = true;
   const today = new Date();
   view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
