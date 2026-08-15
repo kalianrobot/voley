@@ -293,8 +293,11 @@ function deleteTorneo(torneoId) {
   if (estabaViendolo) goToCalendar();
 }
 
+// Gestionar un torneo (sortear, editar, borrar, meter resultados) es cosa
+// exclusiva del admin: las reglas de Firestore (firestore.rules) solo dejan
+// escribir documentos torneo-* a un usuario autenticado, así que ya no tiene
+// sentido comprobar aquí si el dispositivo es el creador del torneo.
 function puedeGestionarTorneo(torneo) {
-  if (isAdmin) return true;
-  return torneo.creatorOwner === DEVICE_ID;
+  return isAdmin;
 }
 
