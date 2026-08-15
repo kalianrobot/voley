@@ -67,6 +67,12 @@ let savingListas = false;
 
 // vista actual: { screen: 'calendar', calYear, calMonth } o { screen: 'list', fecha } o { screen: 'torneo', torneoId }
 let view = { screen: 'calendar', calYear: null, calMonth: null };
+// true si se ha entrado directamente con ?torneo=<id> (ver getTorneoIdFromUrl en
+// main.js): oculta el botón de volver al calendario para que quien reciba el
+// enlace de un torneo no acabe viendo el calendario ni las listas de partidos
+// diarios. Se queda a true el resto de la sesión aunque luego se navegue entre
+// torneos simultáneos con el selector de bloque.
+let entradaPorEnlaceTorneo = false;
 let showNewListModal = false;
 let showNewRedModal = false;
 let newRedData = { fecha: null, nombre: '', balon: '', lineas: '' };

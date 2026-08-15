@@ -268,6 +268,7 @@ function engancharListeners() {
     const fechaUrl = getFechaFromUrl();
     if (torneoUrl && state.torneos[torneoUrl]) {
       view = { screen: 'torneo', torneoId: torneoUrl };
+      entradaPorEnlaceTorneo = true;
     } else if (fechaUrl && state.listas[fechaUrl]) {
       view = { screen: 'list', fecha: fechaUrl };
     }
