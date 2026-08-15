@@ -52,11 +52,7 @@
     radial-gradient(680px 260px at 88% -20%, rgba(46,139,133,0.55), transparent 60%),
     linear-gradient(135deg, var(--sea-deep), var(--sea));
   color: var(--paper);
-  /* Suma el "safe area" del móvil (notch/cámara arriba, muescas laterales en
-     horizontal) al padding normal: sin esto, con viewport-fit=cover la app
-     instalada (standalone) pinta el contenido debajo de esas zonas en vez de
-     solo el fondo. En pantallas sin safe area, env(...) vale 0 y no cambia nada. */
-  padding: calc(30px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 44px calc(20px + env(safe-area-inset-left));
+  padding: 30px 20px 44px;
   position: relative;
   overflow: hidden;
 }
@@ -139,8 +135,7 @@
 .main {
   max-width: 720px;
   margin: 0 auto;
-  /* Misma compensación de safe area que .header, ver comentario ahí. */
-  padding: 22px calc(20px + env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  padding: 22px 20px 84px;
 }
 
 .add-red-btn {
