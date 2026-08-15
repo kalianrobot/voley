@@ -22,7 +22,8 @@ function openEditarTorneoModal(torneoId) {
     equipos: torneo.equipos.map(e => ({ ...e })),
     numGrupos: torneo.numGrupos,
     clasificadosPorGrupo: torneo.clasificadosPorGrupo,
-    numPartidosGrupo: torneo.numPartidosGrupo
+    numPartidosGrupo: torneo.numPartidosGrupo,
+    editarNumPartidos: torneo.numPartidosGrupo !== sugerirNumPartidos(torneo.equipos.length, torneo.numGrupos)
   };
   showEditarTorneoModal = true;
   render();
@@ -52,6 +53,9 @@ function reclamarGruposYClasificadosEdit() {
   if (!opcionesC.includes(editTorneoData.clasificadosPorGrupo)) {
     editTorneoData.clasificadosPorGrupo = opcionesC[opcionesC.length - 1];
   }
+  if (!editTorneoData.editarNumPartidos) {
+    editTorneoData.numPartidosGrupo = sugerirNumPartidos(editTorneoData.equipos.length, editTorneoData.numGrupos);
+  }
 }
 
 function setEditTorneoNumGrupos(value) {
@@ -59,6 +63,9 @@ function setEditTorneoNumGrupos(value) {
   const opciones = opcionesClasificados(editTorneoData.equipos.length, editTorneoData.numGrupos);
   if (!opciones.includes(editTorneoData.clasificadosPorGrupo)) {
     editTorneoData.clasificadosPorGrupo = opciones[opciones.length - 1];
+  }
+  if (!editTorneoData.editarNumPartidos) {
+    editTorneoData.numPartidosGrupo = sugerirNumPartidos(editTorneoData.equipos.length, editTorneoData.numGrupos);
   }
   render();
 }
@@ -70,6 +77,14 @@ function setEditTorneoClasificados(value) {
 
 function setEditTorneoNumPartidos(value) {
   editTorneoData.numPartidosGrupo = Math.max(0, parseInt(value, 10) || 0);
+}
+
+function setEditTorneoEditarNumPartidos(checked) {
+  editTorneoData.editarNumPartidos = checked;
+  if (!checked) {
+    editTorneoData.numPartidosGrupo = sugerirNumPartidos(editTorneoData.equipos.length, editTorneoData.numGrupos);
+  }
+  render();
 }
 
 function setEditTorneoPuntosPorSet(value) {
