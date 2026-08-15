@@ -81,8 +81,13 @@ function renderCompeticionCampos(d, comp, i) {
       </div>
 
       <div class="labeled-field">
-        <label>Partidos en fase de grupos (orientativo, siempre se juega todos contra todos)</label>
-        <input type="number" min="0" id="torneo-${i}-num-partidos" value="${comp.numPartidosGrupo}" onchange="setTorneoNumPartidos(${i}, this.value)" />
+        <label>Partidos en fase de grupos</label>
+        <input type="number" min="0" id="torneo-${i}-num-partidos" value="${comp.numPartidosGrupo}" ${comp.editarNumPartidos ? '' : 'disabled'} onchange="setTorneoNumPartidos(${i}, this.value)" />
+        <label class="checkbox-label">
+          <input type="checkbox" ${comp.editarNumPartidos ? 'checked' : ''} onchange="setTorneoEditarNumPartidos(${i}, this.checked)" />
+          No jugar todos contra todos en este grupo
+        </label>
+        <div class="field-hint">Por defecto cada grupo juega todos contra todos y este número se calcula solo; márcalo si quieres fijar tú el número de partidos.</div>
       </div>
     </div>
   `;
@@ -262,8 +267,13 @@ function renderEditarTorneoModal() {
         </div>
 
         <div class="labeled-field">
-          <label>Partidos en fase de grupos (orientativo, siempre se juega todos contra todos)</label>
-          <input type="number" min="0" value="${d.numPartidosGrupo}" onchange="setEditTorneoNumPartidos(this.value)" />
+          <label>Partidos en fase de grupos</label>
+          <input type="number" min="0" value="${d.numPartidosGrupo}" ${d.editarNumPartidos ? '' : 'disabled'} onchange="setEditTorneoNumPartidos(this.value)" />
+          <label class="checkbox-label">
+            <input type="checkbox" ${d.editarNumPartidos ? 'checked' : ''} onchange="setEditTorneoEditarNumPartidos(this.checked)" />
+            No jugar todos contra todos en este grupo
+          </label>
+          <div class="field-hint">Por defecto cada grupo juega todos contra todos y este número se calcula solo; márcalo si quieres fijar tú el número de partidos.</div>
         </div>
 
         <div style="display:flex; gap:10px;">

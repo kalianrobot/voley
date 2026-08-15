@@ -98,6 +98,7 @@ function nuevaCompeticionBorrador(categoria) {
     equiposNombres: Array(numEquipos).fill(''),
     numGrupos,
     numPartidosGrupo: sugerirNumPartidos(numEquipos, numGrupos),
+    editarNumPartidos: false,
     clasificadosPorGrupo: sugerirClasificados()
   };
 }
@@ -173,6 +174,9 @@ function setTorneoNumGrupos(i, value) {
   if (!opciones.includes(comp.clasificadosPorGrupo)) {
     comp.clasificadosPorGrupo = opciones[opciones.length - 1];
   }
+  if (!comp.editarNumPartidos) {
+    comp.numPartidosGrupo = sugerirNumPartidos(comp.numEquipos, comp.numGrupos);
+  }
   render();
 }
 
@@ -183,6 +187,15 @@ function setTorneoClasificados(i, value) {
 
 function setTorneoNumPartidos(i, value) {
   newTorneoData.competiciones[i].numPartidosGrupo = Math.max(0, parseInt(value, 10) || 0);
+}
+
+function setTorneoEditarNumPartidos(i, checked) {
+  const comp = newTorneoData.competiciones[i];
+  comp.editarNumPartidos = checked;
+  if (!checked) {
+    comp.numPartidosGrupo = sugerirNumPartidos(comp.numEquipos, comp.numGrupos);
+  }
+  render();
 }
 
 function setTorneoPuntosPorSet(value) {
@@ -229,7 +242,8 @@ function onNumEquiposChangeTorneo(i, value) {
     equiposNombres: Array.from({ length: numEquipos }, (_, j) => nombresCapturados[j] || ''),
     numGrupos,
     clasificadosPorGrupo: sugerirClasificados(),
-    numPartidosGrupo: sugerirNumPartidos(numEquipos, numGrupos)
+    numPartidosGrupo: sugerirNumPartidos(numEquipos, numGrupos),
+    editarNumPartidos: false
   };
   render();
 }
