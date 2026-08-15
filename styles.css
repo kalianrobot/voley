@@ -274,6 +274,10 @@ body { margin: 0; }
   font-weight: 600;
   font-size: 14.5px;
   flex: 1;
+  /* Sin esto el nombre no baja de su palabra más larga (min-width:auto de los
+     items flex) y empuja la fila fuera de la tarjeta, que la recorta. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .player-time {
@@ -468,6 +472,21 @@ body { margin: 0; }
   .title { font-size: 27px; }
   .join-form { flex-wrap: wrap; }
   .join-form input[type="text"] { width: 100%; }
+
+  /* La hora ocupaba 90px fijos a la izquierda de cada fila del horario; en un
+     móvil eso deja demasiado poco para los partidos. Se pasa a su propia
+     línea encima y el contenido recupera el ancho completo de la tarjeta. */
+  .horario-fila { flex-direction: column; gap: 6px; }
+  .horario-hora { width: auto; }
+  .horario-arbitro { flex-shrink: 1; }
+
+  /* Partidos de grupo: con los dos nombres y el marcador en una sola línea no
+     queda ancho para los equipos y se parten por la mitad. Se reordena para
+     que los nombres compartan la primera línea y el marcador caiga debajo.
+     Limitado a .grupo-card para no alterar las listas del día. */
+  .grupo-card .player-row { flex-wrap: wrap; row-gap: 8px; }
+  .grupo-card .player-row > .player-name { order: 1; flex: 1 1 40%; }
+  .grupo-card .player-row > *:not(.player-name) { order: 2; }
 }
 
 /* --- Calendario y navegacion --- */
@@ -976,7 +995,7 @@ body { margin: 0; }
   opacity: 0.45;
   padding: 4px 6px;
 }
-.grupo-standings-table td { padding: 6px; border-top: 1px solid rgba(31,42,46,0.06); }
+.grupo-standings-table td { padding: 6px; border-top: 1px solid rgba(31,42,46,0.06); overflow-wrap: anywhere; }
 .grupo-standings-table tr.clasificado td { font-weight: 700; color: var(--sea-deep); }
 
 .bracket-container {
@@ -1016,6 +1035,7 @@ body { margin: 0; }
   font-size: 13.5px;
   font-weight: 600;
   padding: 4px 0;
+  overflow-wrap: anywhere;
 }
 .bracket-team.winner { color: var(--sea-deep); }
 .bracket-team:not(.winner) { opacity: 0.75; }
@@ -1093,6 +1113,7 @@ body { margin: 0; }
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-width: 0;
 }
 
 .horario-celda {
@@ -1100,6 +1121,10 @@ body { margin: 0; }
   gap: 8px;
   align-items: center;
   font-size: 13px;
+  /* Los chips (campo, torneo, árbitro) son flex-shrink:0 y juntos superan el
+     ancho de un móvil: sin wrap la fila se sale y .red-card la recorta. */
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 
 .horario-campo {
