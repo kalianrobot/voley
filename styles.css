@@ -532,7 +532,7 @@ body { margin: 0; }
 
 .cal-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 6px;
 }
 
@@ -549,13 +549,14 @@ body { margin: 0; }
 
 .cal-days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 5px;
 }
 
 .cal-day {
   position: relative;
   aspect-ratio: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -625,6 +626,13 @@ body { margin: 0; }
   color: #ff6b6b;
   text-align: center;
   line-height: 1;
+}
+
+/* En móviles estrechos las celdas del calendario miden ~37-44px: se aprietan
+   los indicadores para que quepan en una sola línea y la celda siga cuadrada. */
+@media (max-width: 460px) {
+  .cal-day-indicators { font-size: 9px; letter-spacing: 0; }
+  .cal-day-espera { font-size: 7px; }
 }
 
 .add-list-btn {
