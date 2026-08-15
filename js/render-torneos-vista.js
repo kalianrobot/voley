@@ -209,9 +209,10 @@ function renderPartidoGrupoRow(torneo, partido, estadoCampos) {
   // Un resultado sin completar siempre se muestra editable; uno ya guardado
   // se cierra (marcador + botón editar) salvo que se haya reabierto a
   // propósito. Los inputs no autoguardan: solo se guarda al pulsar ✓, así
-  // el DOM no se destruye a mitad de escribir el segundo marcador.
+  // el DOM no se destruye a mitad de escribir el segundo marcador. Solo el
+  // admin mete o corrige resultados; el resto solo los ve.
   const completo = partido.puntosA != null && partido.puntosB != null;
-  const editando = !completo || partidosGrupoEnEdicion.has(partido.id);
+  const editando = isAdmin && (!completo || partidosGrupoEnEdicion.has(partido.id));
   const marcador = editando
     ? `
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idA}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosA != null ? partido.puntosA : ''}" />
@@ -219,12 +220,14 @@ function renderPartidoGrupoRow(torneo, partido, estadoCampos) {
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="${idB}" class="player-time-input score-input" style="width:56px; text-align:center;" value="${partido.puntosB != null ? partido.puntosB : ''}" />
       <button class="confirmar-resultado" title="Confirmar resultado" onclick="confirmarResultadoPartidoGrupo('${torneo.id}','${partido.id}')">✓</button>
     `
-    : `
-      <span class="player-time">${partido.puntosA}</span>
-      <span>–</span>
-      <span class="player-time">${partido.puntosB}</span>
-      <button class="editar-resultado" title="Editar resultado" onclick="editarResultadoPartidoGrupo('${partido.id}')">✏️</button>
-    `;
+    : completo
+      ? `
+        <span class="player-time">${partido.puntosA}</span>
+        <span>–</span>
+        <span class="player-time">${partido.puntosB}</span>
+        ${isAdmin ? `<button class="editar-resultado" title="Editar resultado" onclick="editarResultadoPartidoGrupo('${partido.id}')">✏️</button>` : ''}
+      `
+      : `<span class="resultado-pendiente">Pendiente</span>`;
 
   return `
     ${meta}
@@ -284,18 +287,20 @@ function renderPartidoEliminatoria(torneo, partido) {
       const idA = `pe-${partido.id}-${s}-a`;
       const idB = `pe-${partido.id}-${s}-b`;
       const completo = set.puntosA != null && set.puntosB != null;
-      const editando = !completo || setsEliminatoriaEnEdicion.has(`${partido.id}:${s}`);
+      const editando = isAdmin && (!completo || setsEliminatoriaEnEdicion.has(`${partido.id}:${s}`));
       const marcadorSet = editando
         ? `
           <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idA}" value="${set.puntosA != null ? set.puntosA : ''}" />
           <input type="text" inputmode="numeric" pattern="[0-9]*" class="score-input" id="${idB}" value="${set.puntosB != null ? set.puntosB : ''}" />
           <button class="confirmar-resultado" title="Confirmar resultado" onclick="confirmarResultadoSetEliminatoria('${torneo.id}','${partido.id}',${s})">✓</button>
         `
-        : `
-          <span class="player-time">${set.puntosA}</span>
-          <span class="player-time">${set.puntosB}</span>
-          <button class="editar-resultado" title="Editar resultado" onclick="editarResultadoSetEliminatoria('${partido.id}',${s})">✏️</button>
-        `;
+        : completo
+          ? `
+            <span class="player-time">${set.puntosA}</span>
+            <span class="player-time">${set.puntosB}</span>
+            ${isAdmin ? `<button class="editar-resultado" title="Editar resultado" onclick="editarResultadoSetEliminatoria('${partido.id}',${s})">✏️</button>` : ''}
+          `
+          : `<span class="resultado-pendiente">Pendiente</span>`;
       setsHtml += `
         <div class="bracket-set-row">
           <span>Set ${s + 1}</span>
