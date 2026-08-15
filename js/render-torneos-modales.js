@@ -137,6 +137,7 @@ function renderNewTorneoModal() {
 
         ${camposCompeticiones}
 
+        <div class="form-section-label">Fase de grupos</div>
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
             <label>Puntos por set (fase de grupos)</label>
@@ -149,6 +150,7 @@ function renderNewTorneoModal() {
         </div>
         <div class="competicion-nota">Cada set se gana con 2 puntos de ventaja a partir de los puntos por set; para que no se alargue, al llegar al tope se gana aunque sea por 1 (p.ej. a 15 con tope 21: gana 15-13, 18-16 o 21-20).</div>
 
+        <div class="form-section-label">Eliminatorias</div>
         <div class="labeled-field">
           <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
           <input type="number" min="1" step="2" id="torneo-num-sets" value="${d.numSets}" onchange="setTorneoNumSets(this.value)" />
@@ -166,6 +168,7 @@ function renderNewTorneoModal() {
         </div>
         <div class="competicion-nota">Igual que en fase de grupos pero con su propio tope, para poder jugar las eliminatorias a más puntos (p.ej. a 21 con tope 25).</div>
 
+        <div class="form-section-label">Campos y horario</div>
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
             <label>Nº de campos disponibles</label>
@@ -276,6 +279,7 @@ function renderEditarTorneoModal() {
           <div class="field-hint">Por defecto cada grupo juega todos contra todos y este número se calcula solo; márcalo si quieres fijar tú el número de partidos.</div>
         </div>
 
+        <div class="form-section-label">Fase de grupos</div>
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
             <label>Puntos por set (fase de grupos)</label>
@@ -288,6 +292,7 @@ function renderEditarTorneoModal() {
         </div>
         <div class="competicion-nota">Cada set se gana con 2 puntos de ventaja a partir de los puntos por set; para que no se alargue, al llegar al tope se gana aunque sea por 1 (p.ej. a 15 con tope 21: gana 15-13, 18-16 o 21-20).</div>
 
+        <div class="form-section-label">Eliminatorias</div>
         <div class="labeled-field">
           <label>Número de sets por partido (eliminatorias; en fase de grupos se juega un único set)</label>
           <input type="number" min="1" step="2" value="${d.numSets}" onchange="setEditTorneoNumSets(this.value)" />
@@ -305,6 +310,7 @@ function renderEditarTorneoModal() {
         </div>
         <div class="competicion-nota">Igual que en fase de grupos pero con su propio tope, para poder jugar las eliminatorias a más puntos (p.ej. a 21 con tope 25).</div>
 
+        <div class="form-section-label">Campos y horario</div>
         <div style="display:flex; gap:10px;">
           <div class="labeled-field" style="flex:1;">
             <label>Nº de campos disponibles</label>
