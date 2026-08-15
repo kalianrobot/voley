@@ -12,6 +12,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 // Documento histórico: todo el estado en un único blob JSON. Se deja de
 // escribir en cuanto arranca la migración a documentos por entidad (ver
 // migrarSiHaceFalta en main.js), pero se conserva para siempre como copia
@@ -110,43 +111,49 @@ function getDeviceId() {
 
 const DEVICE_ID = getDeviceId();
 
-// PIN de administrador. OJO: al ser una web estática pública, este PIN es
-// visible en el código fuente. Solo evita borrados accidentales o de gente
-// ajena al grupo; no es seguridad real. Cámbialo por el que quieras.
-const ADMIN_PIN = '2222';
-
 // Ruta que hay que teclear para que la app cargue de verdad (ver rutaValida()
-// en main.js). Igual que el PIN de arriba: al ser una web estática el código
-// (y por tanto esta ruta) es visible para quien mire el código fuente, así
-// que solo evita llegar por casualidad o adivinando, no es seguridad real.
+// en main.js). Al ser una web estática el código (y por tanto esta ruta) es
+// visible para quien mire el código fuente, así que solo evita llegar por
+// casualidad o adivinando, no es seguridad real.
 const RUTA_SECRETA = '/karma';
 
-function isAdminStored() {
-  try {
-    return localStorage.getItem('voley_admin') === '1';
-  } catch (e) {
-    return false;
-  }
-}
+// Login de admin: se limpia la sesión de una versión antigua de la app que
+// usaba un PIN comparado en el propio navegador (visible con F12 y que no
+// protegía nada). El PIN ha sido reemplazado por Firebase Authentication —
+// la contraseña vive en el servidor, no en este código — y es lo que aplican
+// de verdad las reglas de Firestore (firestore.rules). El limpiado es
+// silencioso: si alguien seguía con sesión de la versión vieja, simplemente
+// deja de estar en modo admin y tiene que volver a entrar con la contraseña
+// nueva.
+try { localStorage.removeItem('voley_admin'); } catch (e) {}
 
-let isAdmin = isAdminStored();
+// Identificador de la cuenta admin compartida por el grupo: no es secreto
+// (equivale a un nombre de usuario), así que puede ir en el código. La
+// contraseña nunca se escribe aquí — la teclea el admin en loginAdmin() y la
+// valida Firebase Authentication.
+const ADMIN_EMAIL = 'admin@volea-beach-forever.web.app';
+
+let isAdmin = false;
+auth.onAuthStateChanged(user => {
+  isAdmin = !!user;
+  render();
+});
 
 function loginAdmin() {
-  const pin = prompt('Introduce el PIN de admin:');
-  if (pin === null) return;
-  if (pin.trim() !== ADMIN_PIN) {
-    alert('PIN incorrecto.');
-    return;
-  }
-  isAdmin = true;
-  try { localStorage.setItem('voley_admin', '1'); } catch (e) {}
-  render();
+  const pass = prompt('Introduce la contraseña de admin:');
+  if (pass === null) return;
+  auth.signInWithEmailAndPassword(ADMIN_EMAIL, pass).catch(err => {
+    const mensaje = err.code === 'auth/too-many-requests'
+      ? 'Demasiados intentos fallidos. Espera un poco y vuelve a intentarlo.'
+      : 'Contraseña incorrecta.';
+    alert(mensaje);
+  });
+  // onAuthStateChanged se dispara solo y llama a render(); no hace falta
+  // actualizar isAdmin aquí ni en caso de éxito ni de error.
 }
 
 function logoutAdmin() {
-  isAdmin = false;
-  try { localStorage.removeItem('voley_admin'); } catch (e) {}
-  render();
+  auth.signOut();
 }
 
 function emptyState() {

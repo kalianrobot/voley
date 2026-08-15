@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Reglas de seguridad de la base de datos. Esto se aplica en el servidor de
+// Firestore, no en el navegador: es lo único que de verdad impide escribir
+// saltándose la app (la config de Firebase en js/core.js es pública por
+// necesidad, así que cualquiera puede abrir la consola del navegador y llamar
+// al SDK directamente).
+//
+// Todo vive en la colección 'volea', un documento por entidad, distinguidos
+// por prefijo en el ID: 'torneo-<id>', 'dia-<fecha>' y el histórico
+// 'lista-actual'. Las reglas solo cubren un segmento de ruta, de ahí que no
+// haya subcolecciones (ver el comentario en js/core.js).
+//
+// Ojo: el contenido de cada documento es un único campo 'data' con un blob
+// JSON dentro. Las reglas no pueden parsear JSON, así que no se puede validar
+// "solo ha cambiado el resultado del partido X": el control es forzosamente a
+// nivel de documento entero.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /volea/{docId} {
+      // Lectura pública: el resto del grupo no tiene cuenta, y los enlaces
+      // /t/<id> los abre gente de fuera que solo debe poder mirar.
+      allow read: if true;
+
+      // Las sentencias 'allow' se combinan con OR: basta que se cumpla una.
+
+      // Listas de un día: cualquiera puede apuntarse y salirse.
+      allow write: if docId.matches('dia-.*');
+
+      // Todo lo demás (torneos y el histórico lista-actual): solo el admin
+      // autenticado. Cubre crear, sortear, meter resultados, editar y borrar.
+      allow write: if request.auth != null;
+    }
+  }
+}

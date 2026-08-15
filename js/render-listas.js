@@ -231,7 +231,7 @@ function renderCalendar() {
         <div class="cal-days">${daysHtml}</div>
       </div>
       <button class="add-list-btn" onclick="openNewListModal()">+ Nueva lista</button>
-      <button class="add-list-btn" style="margin-top: 10px;" onclick="openNewTorneoModal()">+ Nuevo torneo</button>
+      ${isAdmin ? `<button class="add-list-btn" style="margin-top: 10px;" onclick="openNewTorneoModal()">+ Nuevo torneo</button>` : ''}
       ${isAdmin
         ? `<button class="admin-toggle active" onclick="logoutAdmin()">🔓 Admin activo · salir</button>`
         : `<button class="admin-toggle" onclick="loginAdmin()">🔑 Modo admin</button>`}
