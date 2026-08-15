@@ -1188,6 +1188,17 @@
   cursor: default;
 }
 
+.form-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--coral);
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin: 18px 0 8px;
+}
+
 .competicion-block {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
