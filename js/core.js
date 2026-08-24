@@ -33,7 +33,6 @@ function listaRef(fecha) { return DOC_REF.parent.doc(PREFIJO_DIA + fecha); }
 
 const MAX_PER_RED = 6;
 const MAX_PER_RED_EXTRA = 4;
-const APP_URL = 'https://volea-beach-forever.web.app';
 
 function capacityForRed(red) {
   return red.numero === 1 ? MAX_PER_RED : MAX_PER_RED_EXTRA;
@@ -43,8 +42,13 @@ function hayRedConHueco(redes) {
   return (redes || []).some(r => r.jugadores.length < capacityForRed(r));
 }
 
+// Usa window.location.origin (no una URL fija) para que el enlace del
+// mensaje de WhatsApp siempre apunte al dominio real desde el que corre
+// la app, aunque cambie de hosting/dominio. Incluye RUTA_SECRETA porque
+// rutaValida() rechaza cualquier ruta que no sea exactamente esa (o
+// /t/<id>): sin ella el enlace cae en la página señuelo de 404.
 function urlParaFecha(fecha) {
-  return `${APP_URL}/?fecha=${fecha}`;
+  return `${window.location.origin}${RUTA_SECRETA}/?fecha=${fecha}`;
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
