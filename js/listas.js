@@ -82,7 +82,7 @@ function closeNewRedModal() {
 async function confirmNewRed() {
   const { fecha, nombre, balon, lineas } = newRedData;
   if (!nombre.trim() || !balon.trim() || !lineas.trim()) {
-    alert('Debe rellenar el nombre del creador, balón y líneas');
+    alert('Debes indicar quién lleva la red, quién trae el balón y quién trae las líneas');
     return;
   }
 
