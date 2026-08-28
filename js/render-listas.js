@@ -262,17 +262,18 @@ function renderNewRedModal() {
     <div class="modal-overlay" onclick="if(event.target===this) closeNewRedModal()">
       <div class="modal-box">
         <h3 class="modal-title">Nueva red</h3>
+        <p style="font-size:12px; color:var(--sea); margin:-6px 0 14px;">Puedes poner una persona distinta para cada cosa; las tres se añaden a la lista.</p>
         <div style="margin-bottom: 12px;">
-          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Nombre (quien la lleva)</label>
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Red (quien la lleva)</label>
           <input type="text" id="red-nombre" placeholder="Tu nombre" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
         </div>
         <div style="margin-bottom: 12px;">
-          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Balón</label>
-          <input type="text" id="red-balon" placeholder="Marca o nombre" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Balón (quien lo lleva)</label>
+          <input type="text" id="red-balon" placeholder="Nombre de quien trae el balón" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
         </div>
         <div style="margin-bottom: 18px;">
-          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Líneas</label>
-          <input type="text" id="red-lineas" placeholder="Nombre o marca" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
+          <label style="font-size:12px; font-weight:600; color:var(--sea); display:block; margin-bottom:4px;">Líneas (quien las lleva)</label>
+          <input type="text" id="red-lineas" placeholder="Nombre de quien trae las líneas" maxlength="30" style="width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-family:'Sora',sans-serif; font-size:14px; outline:none; background:var(--sand);" />
         </div>
         <div class="modal-actions">
           <button class="modal-btn cancel" onclick="closeNewRedModal()">Cancelar</button>
