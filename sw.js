@@ -1,11 +1,13 @@
-// Service worker mínimo: solo cachea los archivos estáticos de la app
-// (CSS/JS/manifest/iconos) para que la app instalada cargue rápido y cumpla
-// el requisito de Chrome para poder "instalarse" desde el navegador. Los
-// documentos HTML (index.html decide la ruta secreta en tiempo de carga) y
-// cualquier llamada a Firestore van siempre a la red: aquí no se cachea nada
-// que dependa de la ruta ni de datos en vivo, así que no interfiere con
-// RUTA_SECRETA/rutaValida() ni sirve nunca datos desactualizados del torneo.
-const CACHE = 'volea-static-v8';
+// Service worker mínimo: cachea los archivos estáticos de la app
+// (CSS/JS/manifest/iconos) solo como fallback para uso offline y para cumplir
+// el requisito de Chrome para "instalarse" como PWA. La estrategia es
+// network-first: si hay red, siempre servimos la versión fresca y refrescamos
+// el caché en el proceso; si no hay red, caemos al caché. Así un deploy nuevo
+// llega al navegador en la siguiente carga sin depender de subir la versión
+// del CACHE ni de que el SW se reinstale. Los documentos HTML y las llamadas
+// a Firestore no se interceptan aquí, así que no interfiere con
+// RUTA_SECRETA/rutaValida() ni sirve datos desactualizados del torneo.
+const CACHE = 'volea-static-v9';
 const ASSETS = [
   'styles.css',
   'js/core.js',
@@ -40,5 +42,15 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   const path = url.pathname.replace(/^\//, '');
   if (url.origin !== self.location.origin || !ASSETS.includes(path)) return;
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+  event.respondWith(
+    fetch(event.request)
+      .then(res => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(event.request, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });
