@@ -20,6 +20,9 @@ function renderMaterialChip(fecha, redId, icon, label, tipo, value, options) {
 }
 
 function renderRed(fecha, red, allMembers, hayHuecoEnOtraRed) {
+  // En las sedes de red fija (Echevarri) la red ya está puesta: solo se apunta
+  // quién trae balón y líneas, y la red ni se nombra como "1ª" ni se borra.
+  const redFija = infoSede(fecha).redFija;
   const capacidad = capacityForRed(red);
   const isClosed = red.jugadores.length >= capacidad;
   const slotsLeft = capacidad - red.jugadores.length;
@@ -55,17 +58,17 @@ function renderRed(fecha, red, allMembers, hayHuecoEnOtraRed) {
     <div class="red-card ${isClosed ? 'closed' : ''}">
       <div class="red-head">
         <div class="red-name-row">
-          <span class="red-number">${red.numero}ª red</span>
+          <span class="red-number">${redFija ? 'Red del parque' : `${red.numero}ª red`}</span>
           <span class="red-status ${isClosed ? 'closed-tag' : 'open'}">
             ${isClosed ? 'Cerrada' : `${slotsLeft} libre${slotsLeft !== 1 ? 's' : ''}`}
           </span>
         </div>
-        <button class="delete-red" onclick="deleteRed('${fecha}','${red.id}')" title="Borrar red">✕</button>
+        ${redFija ? '' : `<button class="delete-red" onclick="deleteRed('${fecha}','${red.id}')" title="Borrar red">✕</button>`}
       </div>
 
       <div class="materials-row">
         ${renderMaterialChip(fecha, red.id, '🏐', 'Balón', 'balon', red.materiales.balon, allMembers)}
-        ${renderMaterialChip(fecha, red.id, '🥅', 'Red', 'red', red.materiales.red, allMembers)}
+        ${redFija ? '' : renderMaterialChip(fecha, red.id, '🥅', 'Red', 'red', red.materiales.red, allMembers)}
         ${renderMaterialChip(fecha, red.id, '〜', 'Líneas', 'lineas', red.materiales.lineas, allMembers)}
       </div>
 
@@ -154,10 +157,15 @@ function handleJoinEspera(fecha, nameInputId, timeInputId) {
   }));
   nameInput.value = '';
   if (timeInput) timeInput.value = '';
-  showNotify(`✅ ${nombre} se ha apuntado a la lista de espera del ${formatFechaLarga(fecha)}.`);
+  showNotify(`✅ ${nombre} se ha apuntado a la lista de espera del ${descripcionLista(fecha)}.`);
 }
 
 /* ---------- Render: calendario ---------- */
+
+// Una bolita por red: 🔴 llena, 🟢 con hueco.
+function indicadoresRedes(lista) {
+  return (lista.redes || []).map(red => red.jugadores.length >= capacityForRed(red) ? '🔴' : '🟢');
+}
 
 function renderCalendar() {
   const { calYear, calMonth } = view;
@@ -185,36 +193,55 @@ function renderCalendar() {
   }
 
   const daysHtml = cells.map(cell => {
-    const hasList = cell.key && state.listas[cell.key];
+    // Listas de este día, una por sede (en el orden de SEDES_ORDEN).
+    const listasDia = cell.key
+      ? SEDES_ORDEN
+          .map(sede => ({ sede, clave: claveLista(cell.key, sede), lista: state.listas[claveLista(cell.key, sede)] }))
+          .filter(x => x.lista)
+      : [];
+    const hasList = listasDia.length > 0;
+    const ambas = listasDia.length > 1;
     const torneosDia = cell.key ? torneosEnFecha(cell.key) : [];
     const hasTorneo = torneosDia.length > 0;
     const isToday = cell.key === today;
     const classes = ['cal-day'];
     if (cell.inMonth) classes.push('in-month');
-    if (hasList) classes.push('has-list');
+    if (hasList) classes.push('has-list', ambas ? 'sede-ambas' : `sede-${listasDia[0].sede}`);
     if (hasTorneo) classes.push('has-torneo');
     if (isToday) classes.push('is-today');
-    const onclick = hasList ? `onclick="openLista('${cell.key}')"` : '';
 
+    let onclick = '';
+    if (ambas) onclick = `onclick="openListaDia('${cell.key}', event)"`;
+    else if (hasList) onclick = `onclick="openLista('${listasDia[0].clave}')"`;
+
+    const torneoMarca = hasTorneo ? `<span class="cal-day-torneo" title="${esc(torneosDia.map(nombreTorneo).join(', '))}">🏆</span>` : '';
+
+    // Día con las dos sedes: celda partida en diagonal. El número queda en el
+    // centro y las bolitas de cada sede en su mitad (playa arriba a la
+    // izquierda, la otra abajo a la derecha); sin textos para que quepa.
+    if (ambas) {
+      const mitades = listasDia.map((x, i) => {
+        const espera = (x.lista.espera || []).length;
+        return `<div class="cal-split ${i === 0 ? 'cal-split-a' : 'cal-split-b'}" title="${esc(SEDES[x.sede].nombre)}">${indicadoresRedes(x.lista).join('')}${espera > 0 ? `<span class="cal-split-espera">+${espera}</span>` : ''}</div>`;
+      }).join('');
+      return `<div class="${classes.join(' ')}" ${onclick}><span class="cal-day-num">${cell.dayNum}</span>${torneoMarca}${mitades}</div>`;
+    }
+
+    let sedeMarca = '';
     let indicadores = '';
     let esperaCount = '';
     if (hasList) {
-      const lista = state.listas[cell.key];
-      const ind = [];
-      if (lista.redes && lista.redes.length > 0) {
-        lista.redes.forEach(red => {
-          ind.push(red.jugadores.length >= capacityForRed(red) ? '🔴' : '🟢');
-        });
-      }
+      const { sede, lista } = listasDia[0];
+      sedeMarca = `<span class="cal-day-sede" title="${esc(SEDES[sede].nombre)}">${SEDES[sede].icono}</span>`;
+      const ind = indicadoresRedes(lista);
       indicadores = ind.length > 0 ? `<div class="cal-day-indicators">${ind.join(' ')}</div>` : '';
 
       if (lista.espera && lista.espera.length > 0) {
         esperaCount = `<div class="cal-day-espera">${lista.espera.length} en espera</div>`;
       }
     }
-    const torneoMarca = hasTorneo ? `<span class="cal-day-torneo" title="${esc(torneosDia.map(nombreTorneo).join(', '))}">🏆</span>` : '';
 
-    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${torneoMarca}${indicadores}${esperaCount}</div>`;
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${sedeMarca}${torneoMarca}${indicadores}${esperaCount}</div>`;
   }).join('');
 
   const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
@@ -241,12 +268,17 @@ function renderCalendar() {
 
 function renderNewListModal() {
   if (!showNewListModal) return '';
-  const today = todayStr();
+  const fecha = newListData.fecha || todayStr();
+  const sedesHtml = SEDES_ORDEN.map(id => `
+    <button type="button" class="sede-choice sede-${id} ${newListData.sede === id ? 'active' : ''}" onclick="setNewListSede('${id}')">
+      <span class="sede-choice-icon">${SEDES[id].icono}</span>${SEDES[id].nombre}
+    </button>`).join('');
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeNewListModal()">
       <div class="modal-box">
         <h3 class="modal-title">Nueva lista</h3>
-        <input type="date" id="new-list-date" value="${today}" />
+        <div class="sede-choices">${sedesHtml}</div>
+        <input type="date" id="new-list-date" value="${esc(fecha)}" onchange="newListData.fecha = this.value" />
         <div class="modal-actions">
           <button class="modal-btn cancel" onclick="closeNewListModal()">Cancelar</button>
           <button class="modal-btn confirm" onclick="confirmNewList()">Crear</button>
@@ -286,8 +318,30 @@ function renderNewRedModal() {
 
 /* ---------- Render: vista de lista de un dia ---------- */
 
+// Pestañas 🏖️ Playa | 🌳 Echevarri: solo cuando ese día hay lista en las dos
+// sedes. Cada pestaña lleva el color de su sede y cuántas personas hay
+// apuntadas; la activa va rellena.
+function renderSedeTabs(clave) {
+  const dia = fechaDeClave(clave);
+  const existentes = SEDES_ORDEN.filter(sede => state.listas[claveLista(dia, sede)]);
+  if (existentes.length < 2) return '';
+  const tabs = existentes.map(sede => {
+    const c = claveLista(dia, sede);
+    const apuntados = state.listas[c].redes.reduce((n, r) => n + r.jugadores.length, 0);
+    return `
+      <button type="button" role="tab" aria-selected="${c === clave}" class="sede-tab sede-${sede} ${c === clave ? 'active' : ''}" onclick="openLista('${c}')">
+        <span class="sede-tab-icon">${SEDES[sede].icono}</span>
+        <span class="sede-tab-name">${SEDES[sede].nombre}</span>
+        <span class="sede-tab-count">${apuntados}</span>
+      </button>`;
+  }).join('');
+  return `<div class="sede-tabs" role="tablist">${tabs}</div>`;
+}
+
+// `view.fecha` es la clave de la lista (fecha + sede, ver claveLista).
 function renderListView() {
   const fecha = view.fecha;
+  const sedeInfo = infoSede(fecha);
   const lista = getLista(fecha);
 
   if (!lista) {
@@ -304,7 +358,15 @@ function renderListView() {
   const allMembers = getAllMembers(lista);
 
   let redesHtml = '';
-  if (lista.redes.length === 0) {
+  if (lista.redes.length === 0 && sedeInfo.redFija) {
+    // No debería ocurrir (la lista nace con su red y no se borra), pero si
+    // pasa, que no se quede sin forma de apuntar a nadie.
+    redesHtml = `
+      <div class="empty-state">
+        <div class="big">Esta lista no tiene red</div>
+        <button class="add-red-btn" onclick="crearRedFija('${fecha}')">Crear la red</button>
+      </div>`;
+  } else if (lista.redes.length === 0) {
     redesHtml = `
       <div class="empty-state">
         <div class="big">Todavía no hay redes</div>
@@ -328,21 +390,22 @@ function renderListView() {
       <div class="header-inner">
         <button class="back-btn" onclick="goToCalendar()">‹ Calendario</button>
         <div class="eyebrow">Volea Beach Forever 🏝️</div>
-        <div class="list-date-label">${formatFechaLarga(fecha)}</div>
+        <div class="list-date-label">${formatFechaLarga(fecha)} <span class="sede-pill sede-${sedeInfo.id}">${sedeInfo.icono} ${sedeInfo.nombre}</span></div>
         <div class="title-row">
           <h1 class="title">Lista del día</h1>
         </div>
         <div class="subtitle-row">
           <div class="field-pill">
             <span class="icon">📍</span>
-            <input type="text" id="lugar-input" placeholder="Lugar (Ereaga, etc.)" value="${esc(lista.lugar)}" oninput="setLugar('${fecha}', this.value)" />
+            <input type="text" id="lugar-input" placeholder="${esc(sedeInfo.placeholderLugar)}" value="${esc(lista.lugar)}" oninput="setLugar('${fecha}', this.value)" />
           </div>
         </div>
       </div>
     </div>
 
     <div class="main">
-      <button class="add-red-btn" onclick="openNewRedModal('${fecha}')">+ Nueva red</button>
+      ${renderSedeTabs(fecha)}
+      ${sedeInfo.redFija ? '' : `<button class="add-red-btn" onclick="openNewRedModal('${fecha}')">+ Nueva red</button>`}
       <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
       ${redesHtml}
       ${renderEsperaGlobal(fecha, lista)}

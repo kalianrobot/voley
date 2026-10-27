@@ -10,6 +10,11 @@
   --waiting: #B08642;
   --green: #2E7D32;
   --sun: #F2A93B;
+  /* Colores de las sedes (calendario, pestañas y avisos). */
+  --playa: #2F80C0;
+  --playa-deep: #1B5C8F;
+  --parque: #2E7D32;
+  --parque-deep: #1E5A22;
   --shadow-sm: 0 1px 2px rgba(14,59,64,0.06);
   --shadow-card: 0 1px 2px rgba(14,59,64,0.05), 0 14px 30px -18px rgba(14,59,64,0.35);
   --shadow-lift: 0 22px 48px -18px rgba(14,59,64,0.42);
@@ -607,14 +612,19 @@ body { margin: 0; }
   box-shadow: inset 0 0 0 2px var(--coral);
 }
 
+/* Torneo: un día con torneo lleva borde dorado y el 🏆. Si además tiene lista,
+   el fondo es el de su sede (la diagonal se reserva para "las dos sedes el
+   mismo día"); si no tiene ninguna, se rellena en dorado como antes. */
 .cal-day.has-torneo {
   opacity: 1;
+  box-shadow: inset 0 0 0 2px var(--waiting);
+}
+.cal-day.has-torneo:not(.has-list) {
   background: rgba(176,134,66,0.2);
   color: var(--waiting);
 }
-.cal-day.has-torneo.has-list {
-  background: linear-gradient(135deg, rgba(27,94,99,0.14) 50%, rgba(176,134,66,0.25) 50%);
-  color: var(--sea-deep);
+.cal-day.is-today.has-torneo.in-month {
+  box-shadow: inset 0 0 0 2px var(--coral), inset 0 0 0 4px var(--waiting);
 }
 
 .cal-day-torneo {
@@ -623,6 +633,67 @@ body { margin: 0; }
   right: 4px;
   font-size: 9px;
   line-height: 1;
+}
+
+/* Sedes: playa en azul, Echevarri en verde. */
+.cal-day.has-list.sede-playa {
+  background: rgba(47,128,192,0.20);
+  color: var(--playa-deep);
+}
+.cal-day.has-list.sede-playa:hover { background: rgba(47,128,192,0.30); }
+.cal-day.has-list.sede-echevarri {
+  background: rgba(46,125,50,0.20);
+  color: var(--parque-deep);
+}
+.cal-day.has-list.sede-echevarri:hover { background: rgba(46,125,50,0.30); }
+
+.cal-day-sede {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* Las dos sedes el mismo día: la celda va partida en diagonal (playa arriba a
+   la izquierda, Echevarri abajo a la derecha). */
+.cal-day.has-list.sede-ambas {
+  background: linear-gradient(135deg, rgba(47,128,192,0.32) 50%, rgba(46,125,50,0.32) 50%);
+  color: var(--sea-deep);
+}
+.cal-day.has-list.sede-ambas:hover {
+  background: linear-gradient(135deg, rgba(47,128,192,0.45) 50%, rgba(46,125,50,0.45) 50%);
+}
+.cal-day-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.cal-day.sede-ambas .cal-day-torneo {
+  top: auto;
+  right: auto;
+  bottom: 3px;
+  left: 4px;
+}
+.cal-split {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cal-split-a { top: 3px; left: 3px; }
+.cal-split-b { bottom: 3px; right: 3px; }
+.cal-split-espera {
+  font-size: 7px;
+  font-weight: 700;
+  color: #d64545;
 }
 
 .cal-day .dot {
@@ -652,7 +723,88 @@ body { margin: 0; }
 @media (max-width: 460px) {
   .cal-day-indicators { font-size: 9px; letter-spacing: 0; }
   .cal-day-espera { font-size: 7px; }
+  .cal-day-num { font-size: 13px; }
+  .cal-split { font-size: 7px; }
+  .cal-split-espera { font-size: 6px; }
 }
+
+/* ---------- Sedes en la vista del día y en "Nueva lista" ---------- */
+
+.sede-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: 'Sora', system-ui, sans-serif;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  vertical-align: middle;
+}
+.sede-pill.sede-playa { background: var(--playa); }
+.sede-pill.sede-echevarri { background: var(--parque); }
+
+/* Pestañas 🏖️ Playa | 🌳 Echevarri (solo si ese día hay lista en las dos). */
+.sede-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sede-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  font-family: 'Sora', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.sede-tab:active { transform: scale(0.98); }
+.sede-tab-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.75);
+  color: var(--ink);
+}
+.sede-tab.sede-playa { border-color: var(--playa); color: var(--playa-deep); background: rgba(47,128,192,0.10); }
+.sede-tab.sede-echevarri { border-color: var(--parque); color: var(--parque-deep); background: rgba(46,125,50,0.10); }
+.sede-tab.sede-playa.active { background: var(--playa); color: #fff; }
+.sede-tab.sede-echevarri.active { background: var(--parque); color: #fff; }
+
+/* Selector de sede del modal "Nueva lista". */
+.sede-choices {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sede-choice {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--line);
+  background: var(--sand);
+  font-family: 'Sora', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sede-choice.sede-playa.active { border-color: var(--playa); background: rgba(47,128,192,0.16); color: var(--playa-deep); }
+.sede-choice.sede-echevarri.active { border-color: var(--parque); background: rgba(46,125,50,0.16); color: var(--parque-deep); }
 
 .add-list-btn {
   width: 100%;

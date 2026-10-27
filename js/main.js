@@ -141,11 +141,16 @@ function sanitizeState(s) {
   return { listas, torneos };
 }
 
+// Devuelve la clave de la lista (ver claveLista en core.js): ?fecha=… abre la
+// de la playa, como siempre; ?fecha=…&sede=echevarri abre la de esa sede.
 function getFechaFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
     const fecha = params.get('fecha');
-    if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) return fecha;
+    if (fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      const sede = params.get('sede');
+      return claveLista(fecha, SEDES[sede] ? sede : SEDE_DEFECTO);
+    }
   } catch (e) {
     // ignorar
   }

@@ -31,6 +31,40 @@ const PREFIJO_DIA = 'dia-';
 function torneoRef(id) { return DOC_REF.parent.doc(PREFIJO_TORNEO + id); }
 function listaRef(fecha) { return DOC_REF.parent.doc(PREFIJO_DIA + fecha); }
 
+// Sedes: un mismo día puede tener una lista en cada sede. La "clave" de una
+// lista (lo que en el resto del código se llama `fecha` al pasarla a
+// getLista/updateLista/listaRef…) es 'YYYY-MM-DD' para la playa — idéntica a la
+// de antes de existir las sedes, así que ninguna lista ni documento existente
+// cambia — y 'YYYY-MM-DD-<sede>' para las demás (p. ej. '2026-10-30-echevarri').
+// Los documentos siguen empezando por 'dia-', así que ni la consulta por
+// prefijo ni las reglas de Firestore (dia-.*) necesitan cambios.
+const SEDES = {
+  playa: {
+    id: 'playa', nombre: 'Playa', icono: '🏖️', enLugar: 'en la playa',
+    lugarDefecto: '', placeholderLugar: 'Lugar (Ereaga, etc.)',
+    // La red del parque ya está puesta y es una sola: no se pueden crear
+    // redes nuevas ni hay que apuntar quién lleva la red.
+    redFija: false
+  },
+  echevarri: {
+    id: 'echevarri', nombre: 'Echevarri', icono: '🌳', enLugar: 'en Echevarri',
+    lugarDefecto: 'Parque de Echevarri', placeholderLugar: 'Lugar (parque de Echevarri)',
+    redFija: true
+  }
+};
+const SEDES_ORDEN = ['playa', 'echevarri'];
+const SEDE_DEFECTO = 'playa';
+
+function claveLista(fecha, sede) {
+  return (!sede || sede === SEDE_DEFECTO) ? fecha : `${fecha}-${sede}`;
+}
+function fechaDeClave(clave) { return clave.slice(0, 10); }
+function sedeDeClave(clave) {
+  const sede = clave.slice(11);
+  return SEDES[sede] ? sede : SEDE_DEFECTO;
+}
+function infoSede(clave) { return SEDES[sedeDeClave(clave)]; }
+
 const MAX_PER_RED = 6;
 const MAX_PER_RED_EXTRA = 4;
 
@@ -47,8 +81,13 @@ function hayRedConHueco(redes) {
 // la app, aunque cambie de hosting/dominio. Incluye RUTA_SECRETA porque
 // rutaValida() rechaza cualquier ruta que no sea exactamente esa (o
 // /t/<id>): sin ella el enlace cae en la página señuelo de 404.
-function urlParaFecha(fecha) {
-  return `${window.location.origin}${RUTA_SECRETA}/?fecha=${fecha}`;
+// Recibe la clave de la lista: para la playa el enlace es el de siempre
+// (los antiguos de WhatsApp siguen abriendo la playa); para otras sedes añade
+// &sede=<sede>.
+function urlParaFecha(clave) {
+  const sede = sedeDeClave(clave);
+  const extra = sede === SEDE_DEFECTO ? '' : `&sede=${sede}`;
+  return `${window.location.origin}${RUTA_SECRETA}/?fecha=${fechaDeClave(clave)}${extra}`;
 }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIAS_SEMANA = ['L','M','X','J','V','S','D'];
@@ -80,6 +119,7 @@ let view = { screen: 'calendar', calYear: null, calMonth: null };
 // el selector de bloque.
 let entradaPorEnlaceTorneo = false;
 let showNewListModal = false;
+let newListData = { fecha: null, sede: 'playa' }; // se inicializa en openNewListModal()
 let showNewRedModal = false;
 let newRedData = { fecha: null, nombre: '', balon: '', lineas: '' };
 let notifyMessage = null;
@@ -216,8 +256,16 @@ function newRed(num) {
   };
 }
 
-function emptyLista() {
-  return { lugar: '', espera: [], redes: [], historial: [] };
+// `sede` es la sede de la lista (ver SEDES). La de una sede con red fija
+// (Echevarri) nace ya con su única red, porque no se pueden añadir más.
+function emptyLista(sede) {
+  const info = SEDES[sede] || SEDES[SEDE_DEFECTO];
+  return {
+    lugar: info.lugarDefecto,
+    espera: [],
+    redes: info.redFija ? [newRed(1)] : [],
+    historial: []
+  };
 }
 
 const HISTORIAL_MAX = 30;
@@ -244,10 +292,17 @@ function parseDateKey(key) {
   return new Date(y, m - 1, d);
 }
 
+// key puede ser una fecha o la clave de una lista (con sede): solo cuenta la fecha.
 function formatFechaLarga(key) {
-  const d = parseDateKey(key);
+  const d = parseDateKey(fechaDeClave(key));
   const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   return `${diasSemana[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
+}
+
+// Para los avisos al grupo: "sábado, 31 de octubre · 🏖️ Playa".
+function descripcionLista(clave) {
+  const info = infoSede(clave);
+  return `${formatFechaLarga(clave)} · ${info.icono} ${info.nombre}`;
 }
 
 const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -393,10 +448,27 @@ function goToCalendar() {
   render();
 }
 
+// `fecha` es la clave de la lista (ver claveLista).
 function openLista(fecha) {
   view = { screen: 'list', fecha };
   showHistorial = false;
   render();
+}
+
+// Toque en un día del calendario que tiene lista en las dos sedes: la celda
+// está partida en diagonal (playa arriba a la izquierda, la otra abajo a la
+// derecha) y se abre la sede de la mitad tocada.
+function openListaDia(fecha, ev) {
+  let sede = SEDES_ORDEN[0];
+  try {
+    const r = ev.currentTarget.getBoundingClientRect();
+    const x = (ev.clientX - r.left) / r.width;
+    const y = (ev.clientY - r.top) / r.height;
+    if (x + y > 1) sede = SEDES_ORDEN[1];
+  } catch (e) {
+    // sin coordenadas: se abre la primera sede
+  }
+  openLista(claveLista(fecha, sede));
 }
 
 // Navegación dentro de la app: si ya se entró por el enlace directo de un
@@ -435,6 +507,7 @@ function calNextMonth() {
 }
 
 function openNewListModal() {
+  newListData = { fecha: todayStr(), sede: SEDE_DEFECTO };
   showNewListModal = true;
   render();
 }
@@ -444,17 +517,26 @@ function closeNewListModal() {
   render();
 }
 
+// Cambiar de sede vuelve a pintar el modal: la fecha ya elegida se guarda
+// aparte (newListData.fecha, ver el onchange del input) para no perderla.
+function setNewListSede(sede) {
+  const input = document.getElementById('new-list-date');
+  if (input && input.value) newListData.fecha = input.value;
+  newListData.sede = SEDES[sede] ? sede : SEDE_DEFECTO;
+  render();
+}
+
 async function confirmNewList() {
   const input = document.getElementById('new-list-date');
   if (!input || !input.value) return;
-  const fecha = input.value;
+  const fecha = claveLista(input.value, newListData.sede);
   const yaExistia = !!state.listas[fecha];
   const resultado = await crearLista(fecha); // crearLista no pisa si ya existía
   if (!resultado) return; // el guardado falló (ya se ha avisado); no navegar a una lista que no se ha creado
   showNewListModal = false;
   openLista(fecha);
   if (!yaExistia) {
-    showNotify(`📅 Nueva lista creada para el ${formatFechaLarga(fecha)}. ¡Apuntaos! ${urlParaFecha(fecha)}`);
+    showNotify(`📅 Nueva lista creada para el ${descripcionLista(fecha)}. ¡Apuntaos! ${urlParaFecha(fecha)}`);
   }
 }
 
