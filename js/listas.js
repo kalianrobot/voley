@@ -17,7 +17,7 @@ async function updateLista(fecha, updater, opts = {}) {
     return await db.runTransaction(async (tx) => {
       const ref = listaRef(fecha);
       const snap = await tx.get(ref);
-      const actual = snap.exists ? sanitizeLista(JSON.parse(snap.data().data)) : emptyLista();
+      const actual = snap.exists ? sanitizeLista(JSON.parse(snap.data().data)) : emptyLista(sedeDeClave(fecha));
       const nueva = typeof updater === 'function' ? updater(actual) : updater;
       tx.set(ref, { data: JSON.stringify(nueva) });
       return nueva;
@@ -39,7 +39,7 @@ async function crearLista(fecha) {
       const ref = listaRef(fecha);
       const snap = await tx.get(ref);
       if (snap.exists) return sanitizeLista(JSON.parse(snap.data().data)); // ya existe, no pisar
-      const nueva = emptyLista();
+      const nueva = emptyLista(sedeDeClave(fecha));
       tx.set(ref, { data: JSON.stringify(nueva) });
       return nueva;
     });
@@ -81,6 +81,7 @@ function closeNewRedModal() {
 
 async function confirmNewRed() {
   const { fecha, nombre, balon, lineas } = newRedData;
+  if (infoSede(fecha).redFija) return; // las sedes de red fija no admiten redes nuevas
   if (!nombre.trim() || !balon.trim() || !lineas.trim()) {
     alert('Debes indicar quién lleva la red, quién trae el balón y quién trae las líneas');
     return;
@@ -125,9 +126,18 @@ async function confirmNewRed() {
 }
 
 function sendConvocatoria(fecha) {
-  showNotify(`📣 Lista abierta ${formatFechaLarga(fecha)}. ¡Apúntate aquí! ${urlParaFecha(fecha)}`);
+  showNotify(`📣 Lista abierta ${descripcionLista(fecha)}. ¡Apúntate aquí! ${urlParaFecha(fecha)}`);
 }
+
+// Red de respaldo para una lista de red fija que se quedó sin ninguna (no
+// debería pasar: nacen con ella y no se puede borrar).
+function crearRedFija(fecha) {
+  if (!infoSede(fecha).redFija) return;
+  updateLista(fecha, prev => prev.redes.length > 0 ? prev : { ...prev, redes: [newRed(1)] });
+}
+
 function deleteRed(fecha, id) {
+  if (infoSede(fecha).redFija) return; // la red de estas sedes no se borra
   const lista = getLista(fecha);
   const red = lista.redes.find(r => r.id === id);
   const etiqueta = red ? `la ${red.numero}ª red` : 'esta red';
@@ -136,14 +146,14 @@ function deleteRed(fecha, id) {
     ...prev,
     redes: prev.redes.filter(r => r.id !== id).map((r, i) => ({ ...r, numero: i + 1 }))
   }));
-  showNotify(`⚠️ Se ha borrado ${etiqueta} del ${formatFechaLarga(fecha)}.`);
+  showNotify(`⚠️ Se ha borrado ${etiqueta} del ${descripcionLista(fecha)}.`);
 }
 
 function deleteLista(fecha) {
-  if (!confirm(`¿Borrar toda la lista del ${formatFechaLarga(fecha)}? Se perderá todo lo apuntado.`)) return;
+  if (!confirm(`¿Borrar toda la lista del ${descripcionLista(fecha)}? Se perderá todo lo apuntado.`)) return;
   borrarListaDoc(fecha);
   goToCalendar();
-  showNotify(`🗑️ Se ha borrado la lista completa del ${formatFechaLarga(fecha)}.`);
+  showNotify(`🗑️ Se ha borrado la lista completa del ${descripcionLista(fecha)}.`);
 }
 
 function setLugar(fecha, val) {
@@ -239,7 +249,8 @@ async function removeFromRed(fecha, redId, entryId) {
     };
   });
 
-  let mensaje = `❌ ${nombre} se ha quitado de la ${red?.numero}ª red del ${formatFechaLarga(fecha)}.`;
+  const etiquetaRed = infoSede(fecha).redFija ? 'la red' : `la ${red?.numero}ª red`;
+  let mensaje = `❌ ${nombre} se ha quitado de ${etiquetaRed} del ${descripcionLista(fecha)}.`;
   if (nombrePromovido) {
     mensaje += ` ✅ ${nombrePromovido} subió automáticamente de la lista de espera.`;
   }
