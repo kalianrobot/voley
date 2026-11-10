@@ -224,14 +224,17 @@ function renderCalendar() {
         const espera = (x.lista.espera || []).length;
         return `<div class="cal-split ${i === 0 ? 'cal-split-a' : 'cal-split-b'}" title="${esc(SEDES[x.sede].nombre)}">${indicadoresRedes(x.lista).join('')}${espera > 0 ? `<span class="cal-split-espera">+${espera}</span>` : ''}</div>`;
       }).join('');
-      return `<div class="${classes.join(' ')}" ${onclick}><span class="cal-day-num">${cell.dayNum}</span>${torneoMarca}${mitades}</div>`;
+      const tiempoMarca = renderTiempoCalendario(cell.key, listasDia[0].sede, listasDia[0].lista);
+      return `<div class="${classes.join(' ')}" ${onclick}><span class="cal-day-num">${cell.dayNum}</span>${torneoMarca}${tiempoMarca}${mitades}</div>`;
     }
 
     let sedeMarca = '';
     let indicadores = '';
     let esperaCount = '';
+    let tiempoMarca = '';
     if (hasList) {
       const { sede, lista } = listasDia[0];
+      tiempoMarca = renderTiempoCalendario(cell.key, sede, lista);
       sedeMarca = `<span class="cal-day-sede" title="${esc(SEDES[sede].nombre)}">${SEDES[sede].icono}</span>`;
       const ind = indicadoresRedes(lista);
       indicadores = ind.length > 0 ? `<div class="cal-day-indicators">${ind.join(' ')}</div>` : '';
@@ -241,7 +244,7 @@ function renderCalendar() {
       }
     }
 
-    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${sedeMarca}${torneoMarca}${indicadores}${esperaCount}</div>`;
+    return `<div class="${classes.join(' ')}" ${onclick}>${cell.dayNum}${sedeMarca}${torneoMarca}${tiempoMarca}${indicadores}${esperaCount}</div>`;
   }).join('');
 
   const weekdaysHtml = DIAS_SEMANA.map(d => `<div class="cal-weekday">${d}</div>`).join('');
@@ -405,6 +408,7 @@ function renderListView() {
 
     <div class="main">
       ${renderSedeTabs(fecha)}
+      ${renderTiempoLista(fecha, lista)}
       ${sedeInfo.redFija ? '' : `<button class="add-red-btn" onclick="openNewRedModal('${fecha}')">+ Nueva red</button>`}
       <button class="add-red-btn" style="border-color: var(--coral); color: var(--coral); margin-top: 10px;" onclick="sendConvocatoria('${fecha}')">📣 Enviar convocatoria a WhatsApp</button>
       ${redesHtml}

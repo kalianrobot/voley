@@ -340,6 +340,8 @@ function init() {
   view = { screen: 'calendar', calYear: today.getFullYear(), calMonth: today.getMonth() };
   render();
 
+  iniciarTiempo();
+
   migrarSiHaceFalta()
     .catch(err => console.error('Error migrando a documentos por entidad', err))
     .finally(() => engancharListeners());

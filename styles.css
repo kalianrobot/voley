@@ -1440,3 +1440,108 @@ body { margin: 0; }
   transition: background 0.15s, border-color 0.15s;
 }
 .add-equipo-btn:hover { background: var(--paper); border-color: rgba(27,94,99,0.4); }
+
+/* ---------- Tiempo (Open-Meteo) ---------- */
+
+/* Calendario: icono arriba a la derecha (a la izquierda del 🏆 si lo hay). */
+.cal-day-tiempo {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+.cal-day.has-torneo:not(.sede-ambas) .cal-day-tiempo { right: 15px; }
+.cal-day-tiempo-viento { font-size: 7px; margin-left: 1px; }
+
+/* Vista del día */
+.tiempo-card {
+  background: var(--paper, #fffcf5);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px 10px;
+  margin-bottom: 14px;
+}
+.tiempo-vacio {
+  font-size: 13px;
+  color: var(--sea);
+  padding: 12px 16px;
+}
+.tiempo-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sea);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tiempo-resumen {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+.tiempo-icono { font-size: 40px; line-height: 1; }
+.tiempo-temp {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--sea-deep);
+}
+.tiempo-desc {
+  font-family: 'Sora', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+  opacity: 0.75;
+}
+.tiempo-linea { font-size: 13px; margin-top: 2px; }
+.tiempo-linea.viento-medio { color: #b07a1e; font-weight: 600; }
+.tiempo-linea.viento-fuerte { color: var(--coral); font-weight: 700; }
+
+.viento-flecha {
+  display: inline-block;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tiempo-franja {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 12px -4px 0;
+  padding: 2px 4px 6px;
+  scrollbar-width: thin;
+}
+.tiempo-hora {
+  flex: 0 0 auto;
+  min-width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  background: var(--sand);
+  font-size: 11px;
+}
+.tiempo-hora.actual {
+  background: var(--sea);
+  color: var(--paper, #fffcf5);
+}
+.tiempo-hora-h { font-weight: 700; }
+.tiempo-hora-icono { font-size: 18px; line-height: 1.1; }
+.tiempo-hora-temp { font-weight: 600; font-size: 12px; }
+.tiempo-hora-lluvia { opacity: 0.8; font-size: 10px; }
+.tiempo-hora-viento { font-size: 10px; display: flex; align-items: center; gap: 1px; }
+.tiempo-hora.viento-medio:not(.actual) .tiempo-hora-viento { color: #b07a1e; font-weight: 700; }
+.tiempo-hora.viento-fuerte:not(.actual) .tiempo-hora-viento { color: var(--coral); font-weight: 700; }
+.tiempo-hora.viento-fuerte.actual .tiempo-hora-viento { font-weight: 700; }
+
+.tiempo-fuente {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 6px;
+}
+.tiempo-fuente a { color: inherit; }
