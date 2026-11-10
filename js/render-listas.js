@@ -260,6 +260,7 @@ function renderCalendar() {
         <div class="cal-weekdays">${weekdaysHtml}</div>
         <div class="cal-days">${daysHtml}</div>
       </div>
+      ${renderTiempoProximosDias()}
       <button class="add-list-btn" onclick="openNewListModal()">+ Nueva lista</button>
       ${isAdmin ? `<button class="add-list-btn" style="margin-top: 10px;" onclick="openNewTorneoModal()">+ Nuevo torneo</button>` : ''}
       ${isAdmin

@@ -293,3 +293,86 @@ function renderTiempoLista(clave, lista) {
       <div class="tiempo-fuente">Previsión de <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>${actualizado ? ` · actualizada a las ${actualizado}` : ''}${hora == null ? ' · poned la hora al apuntaros para ver el tiempo a esa hora' : ''}</div>
     </div>`;
 }
+
+/* ---------- Render: próximos días (debajo del calendario) ---------- */
+
+const TIEMPO_DIAS_CALENDARIO = 10;
+const DIAS_SEMANA_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+let tiempoSedeCalendario = 'playa';
+
+function setTiempoSedeCalendario(sede) {
+  if (!TIEMPO_SEDES[sede]) return;
+  tiempoSedeCalendario = sede;
+  render();
+}
+
+// Resumen de las horas en que se juega (franja TIEMPO_HORAS_FRANJA): lo que
+// importa es el viento de la tarde, no el máximo de las 4 de la mañana.
+function resumenDiurno(sede, fecha) {
+  const dia = tiempoDia(sede, fecha);
+  if (!dia) return null;
+  const [desde, hasta] = TIEMPO_HORAS_FRANJA;
+  const horas = [];
+  for (let h = desde; h <= hasta; h++) {
+    const t = tiempoHora(sede, fecha, h);
+    if (t) horas.push(t);
+  }
+  if (horas.length === 0) return dia;
+  const max = k => Math.max(...horas.map(t => t[k] ?? 0));
+  // Dirección: la de la hora más ventosa.
+  const masVentosa = horas.reduce((a, b) => ((b.viento ?? 0) > (a.viento ?? 0) ? b : a));
+  return {
+    ...dia,
+    probLluvia: max('probLluvia'),
+    viento: max('viento'),
+    rachas: max('rachas'),
+    dirViento: masVentosa.dirViento
+  };
+}
+
+function renderTiempoProximosDias() {
+  const sede = tiempoSedeCalendario;
+  const lugar = TIEMPO_SEDES[sede];
+  const hoy = new Date();
+  const dias = [];
+  for (let i = 0; i < TIEMPO_DIAS_CALENDARIO; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + i);
+    const fecha = formatDateKey(d);
+    const t = resumenDiurno(sede, fecha);
+    if (!t) continue;
+    const clave = claveLista(fecha, sede);
+    const hayLista = !!(state && state.listas && state.listas[clave]);
+    const etiqueta = i === 0 ? 'hoy' : (i === 1 ? 'mañana' : DIAS_SEMANA_CORTOS[d.getDay()]);
+    dias.push(`
+      <div class="tiempo-dia ${hayLista ? `con-lista sede-${sede}` : ''} viento-${nivelViento(t)}" ${hayLista ? `onclick="openLista('${clave}')"` : ''} title="${esc(resumenTiempoTitle(t, null))}">
+        <span class="tiempo-dia-nombre">${etiqueta}</span>
+        <span class="tiempo-dia-num">${d.getDate()}</span>
+        <span class="tiempo-dia-icono">${iconoTiempo(t.codigo)}</span>
+        <span class="tiempo-dia-temp">${r0(t.max)}°<small>/${r0(t.min)}°</small></span>
+        <span class="tiempo-dia-lluvia">💧${r0(t.probLluvia)}%</span>
+        <span class="tiempo-dia-viento">${flechaViento(t.dirViento)}${r0(t.viento)}</span>
+        <span class="tiempo-dia-rachas">rachas ${r0(t.rachas)}</span>
+      </div>`);
+  }
+
+  const selector = Object.keys(TIEMPO_SEDES).map(s => `
+    <button type="button" class="tiempo-sede-btn sede-${s} ${s === sede ? 'active' : ''}" onclick="setTiempoSedeCalendario('${s}')">${SEDES[s] ? SEDES[s].icono : ''} ${esc(TIEMPO_SEDES[s].nombre)}</button>`).join('');
+
+  let cuerpo;
+  if (dias.length > 0) cuerpo = `<div class="tiempo-dias">${dias.join('')}</div>`;
+  else if (tiempoError) cuerpo = `<div class="tiempo-vacio">No se ha podido cargar la previsión del tiempo.</div>`;
+  else cuerpo = `<div class="tiempo-vacio">Cargando la previsión…</div>`;
+
+  const ts = tiempoCache[sede]?.ts;
+  const actualizado = ts ? new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+
+  return `
+    <div class="tiempo-card tiempo-proximos">
+      <div class="tiempo-proximos-head">
+        <span class="tiempo-titulo">Tiempo próximos días</span>
+        <div class="tiempo-sedes">${selector}</div>
+      </div>
+      ${cuerpo}
+      <div class="tiempo-fuente">Viento y lluvia: lo peor entre las ${TIEMPO_HORAS_FRANJA[0]}h y las ${TIEMPO_HORAS_FRANJA[1]}h en ${esc(lugar.nombre)} (km/h) · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>${actualizado ? ` · ${actualizado}` : ''}</div>
+    </div>`;
+}

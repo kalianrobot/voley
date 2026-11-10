@@ -1545,3 +1545,64 @@ body { margin: 0; }
   margin-top: 6px;
 }
 .tiempo-fuente a { color: inherit; }
+
+/* Próximos días, debajo del calendario */
+.tiempo-proximos { margin-bottom: 20px; }
+.tiempo-proximos-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tiempo-sedes { display: flex; gap: 6px; }
+.tiempo-sede-btn {
+  border: 1px solid var(--line);
+  background: var(--sand);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: 'Sora', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tiempo-sede-btn.active.sede-playa { background: var(--playa); border-color: var(--playa); color: #fff; }
+.tiempo-sede-btn.active.sede-echevarri { background: var(--parque); border-color: var(--parque); color: #fff; }
+
+.tiempo-dias {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 12px -4px 0;
+  padding: 2px 4px 6px;
+  scrollbar-width: thin;
+}
+.tiempo-dia {
+  flex: 0 0 auto;
+  min-width: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border-radius: 12px;
+  background: var(--sand);
+  border: 2px solid transparent;
+  font-size: 11px;
+}
+.tiempo-dia.con-lista { cursor: pointer; }
+.tiempo-dia.con-lista.sede-playa { border-color: var(--playa); }
+.tiempo-dia.con-lista.sede-echevarri { border-color: var(--parque); }
+.tiempo-dia-nombre { font-weight: 700; text-transform: capitalize; }
+.tiempo-dia-num { font-size: 10px; opacity: 0.6; margin-top: -2px; }
+.tiempo-dia-icono { font-size: 22px; line-height: 1.15; }
+.tiempo-dia-temp { font-weight: 700; font-size: 13px; }
+.tiempo-dia-temp small { font-weight: 400; opacity: 0.65; font-size: 11px; }
+.tiempo-dia-lluvia { font-size: 10px; opacity: 0.8; }
+.tiempo-dia-viento { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 1px; }
+.tiempo-dia-rachas { font-size: 9px; opacity: 0.7; }
+.tiempo-dia.viento-medio .tiempo-dia-viento { color: #b07a1e; }
+.tiempo-dia.viento-fuerte .tiempo-dia-viento,
+.tiempo-dia.viento-fuerte .tiempo-dia-rachas { color: var(--coral); opacity: 1; }
+.tiempo-vacio { font-size: 13px; color: var(--sea); margin-top: 10px; }
